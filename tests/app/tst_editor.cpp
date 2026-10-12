@@ -1,13 +1,17 @@
+#include "ColumnEditorDialog.h"
 #include "DocumentController.h"
 #include "EntityEditorPanel.h"
 
+#include <QCheckBox>
+#include <QComboBox>
+#include <QLineEdit>
+#include <QPushButton>
+#include <QTimer>
 #include <QtTest>
 
 using namespace bb;
 
 namespace {
-
-using namespace bb;
 
 CanonicalType bigintType()
 {
@@ -24,6 +28,11 @@ class EntityEditorTest : public QObject
 
 private slots:
     void panelReflectsModelChanges();
+    void addColumnViaButton_showsInList();
+    void primaryKeySelectsAutoIncrementAndUnique();
+    void enumRowTogglesWithKind();
+    void dialogRejectsDuplicateNames();
+    void dialogRejectsEmptyName();
 };
 
 void EntityEditorTest::panelReflectsModelChanges()
@@ -49,10 +58,89 @@ void EntityEditorTest::panelReflectsModelChanges()
     controller.removeColumn(entityId, idColumnId);
     QCOMPARE(panel.columnCount(), 1);
 
-    // Clearing a selection empties the panel.
     panel.clear();
     QVERIFY(!panel.isEnabled());
     QCOMPARE(panel.columnCount(), 0);
+}
+
+void EntityEditorTest::addColumnViaButton_showsInList()
+{
+    DocumentController controller;
+    EntityEditorPanel panel;
+    panel.setDocument(&controller);
+    panel.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&panel));
+
+    const Id entityId = controller.addEntity(QStringLiteral("customer"))->id;
+    panel.showEntity(entityId);
+
+    QTimer::singleShot(0, [&panel] {
+        auto *dialog = panel.findChild<ColumnEditorDialog *>();
+        QVERIFY(dialog);
+        dialog->findChild<QLineEdit *>(QStringLiteral("nameEdit"))->setText(QStringLiteral("id"));
+        dialog->accept();
+    });
+
+    auto *addButton = panel.findChild<QPushButton *>(QStringLiteral("addButton"));
+    QVERIFY(addButton);
+    QTest::mouseClick(addButton, Qt::LeftButton);
+
+    QCOMPARE(panel.columnCount(), 1);
+    QVERIFY(!panel.columnIdAt(0).isNull());
+
+    panel.close();
+}
+
+void EntityEditorTest::primaryKeySelectsAutoIncrementAndUnique()
+{
+    ColumnEditorDialog dialog;
+    auto *pk = dialog.findChild<QCheckBox *>(QStringLiteral("primaryKeyCheck"));
+    auto *ai = dialog.findChild<QCheckBox *>(QStringLiteral("autoIncrementCheck"));
+    auto *unique = dialog.findChild<QCheckBox *>(QStringLiteral("uniqueCheck"));
+    QVERIFY(pk && ai && unique);
+
+    QVERIFY(!ai->isChecked());
+    pk->setChecked(true);
+    QVERIFY(ai->isChecked());
+    QVERIFY(unique->isChecked());
+}
+
+void EntityEditorTest::enumRowTogglesWithKind()
+{
+    ColumnEditorDialog dialog;
+    auto *kind = dialog.findChild<QComboBox *>(QStringLiteral("kindCombo"));
+    auto *enumValues = dialog.findChild<QLineEdit *>(QStringLiteral("enumValuesEdit"));
+    QVERIFY(kind && enumValues);
+
+    // Default kind is Varchar: enum values row is hidden.
+    QVERIFY(enumValues->isHidden());
+
+    kind->setCurrentText(QStringLiteral("Enum"));
+    QVERIFY(!enumValues->isHidden());
+    QVERIFY(enumValues->isEnabled());
+
+    kind->setCurrentText(QStringLiteral("BigInt"));
+    QVERIFY(enumValues->isHidden());
+}
+
+void EntityEditorTest::dialogRejectsDuplicateNames()
+{
+    ColumnEditorDialog dialog;
+    dialog.setExistingNames({QStringLiteral("id"), QStringLiteral("email")});
+    auto *name = dialog.findChild<QLineEdit *>(QStringLiteral("nameEdit"));
+
+    name->setText(QStringLiteral("ID"));   // case-insensitive duplicate
+    QVERIFY(!dialog.validationError({QStringLiteral("id"), QStringLiteral("email")}).isEmpty());
+
+    name->setText(QStringLiteral("fresh"));
+    QVERIFY(dialog.validationError({QStringLiteral("id"), QStringLiteral("email")}).isEmpty());
+}
+
+void EntityEditorTest::dialogRejectsEmptyName()
+{
+    ColumnEditorDialog dialog;
+    dialog.findChild<QLineEdit *>(QStringLiteral("nameEdit"))->setText(QStringLiteral("   "));
+    QVERIFY(!dialog.validationError({}).isEmpty());
 }
 
 QTEST_MAIN(EntityEditorTest)

@@ -184,9 +184,20 @@ Column *DocumentController::addColumn(const Id &entityId, const QString &name,
     if (!entity)
         return nullptr;
 
+    const QString trimmed = name.trimmed();
+    if (trimmed.isEmpty())
+        return nullptr;
+
+    // Column names must be unique within a table (compared case-insensitively, as most
+    // engines resolve unquoted identifiers).
+    for (const Column &column : entity->columns) {
+        if (column.name.compare(trimmed, Qt::CaseInsensitive) == 0)
+            return nullptr;
+    }
+
     Column column;
     column.id = Id::create();
-    column.name = name;
+    column.name = trimmed;
     column.type = type;
     column.nullable = nullable;
     column.primaryKey = primaryKey;
@@ -205,9 +216,23 @@ bool DocumentController::updateColumn(const Id &entityId, const Column &column)
     Entity *entity = m_model.findEntity(entityId);
     if (!entity)
         return false;
+
+    const QString trimmed = column.name.trimmed();
+    if (trimmed.isEmpty())
+        return false;
+
+    // Renames must not collide with a sibling column.
+    for (const Column &other : entity->columns) {
+        if (other.id == column.id)
+            continue;
+        if (other.name.compare(trimmed, Qt::CaseInsensitive) == 0)
+            return false;
+    }
+
     for (Column &candidate : entity->columns) {
         if (candidate.id == column.id) {
             Column updated = column;
+            updated.name = trimmed;
             updated.id = column.id;   // ids are immutable
             candidate = updated;
             emit modelChanged();

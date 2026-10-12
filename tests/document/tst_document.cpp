@@ -37,6 +37,7 @@ private slots:
     void removeEntity_cascadesRelationshipsAndNodes();
     void removeColumn_removesRelationshipsAndIndexes();
     void columnCrud_addUpdateRemove();
+    void duplicateColumnNamesRejected();
 };
 
 void DocumentControllerTest::addRelationship_linksTables()
@@ -207,6 +208,33 @@ void DocumentControllerTest::columnCrud_addUpdateRemove()
 
     // Unknown entity.
     QVERIFY(!controller.addColumn(Id::create(), QStringLiteral("x"), bigint, true, false, false, false));
+}
+
+void DocumentControllerTest::duplicateColumnNamesRejected()
+{
+    DocumentController controller;
+    const Id entityId = controller.addEntity(QStringLiteral("customer"))->id;
+
+    CanonicalType bigint;
+    bigint.kind = CanonicalType::Kind::BigInt;
+
+    QVERIFY(controller.addColumn(entityId, QStringLiteral("id"), bigint, true, false, false, false));
+    // Case-insensitive duplicate is rejected.
+    QVERIFY(!controller.addColumn(entityId, QStringLiteral("ID"), bigint, true, false, false, false));
+    // Empty names are rejected.
+    QVERIFY(!controller.addColumn(entityId, QStringLiteral("   "), bigint, true, false, false, false));
+
+    const Id emailId =
+        controller.addColumn(entityId, QStringLiteral("email"), bigint, true, false, false, false)->id;
+
+    // Renaming onto a duplicate fails; renaming to a fresh name succeeds.
+    Column renamed = *controller.model()->findEntity(entityId)->findColumn(emailId);
+    renamed.name = QStringLiteral("Id");
+    QVERIFY(!controller.updateColumn(entityId, renamed));
+
+    renamed.name = QStringLiteral("public_email");
+    QVERIFY(controller.updateColumn(entityId, renamed));
+    QCOMPARE(controller.model()->findEntity(entityId)->columns.size(), 2);
 }
 
 QTEST_APPLESS_MAIN(DocumentControllerTest)

@@ -31,6 +31,9 @@ EntityEditorPanel::EntityEditorPanel(QWidget *parent)
     m_addButton = new QPushButton(tr("Add Column"), this);
     m_editButton = new QPushButton(tr("Edit…"), this);
     m_removeButton = new QPushButton(tr("Remove"), this);
+    m_addButton->setObjectName(QStringLiteral("addButton"));
+    m_editButton->setObjectName(QStringLiteral("editButton"));
+    m_removeButton->setObjectName(QStringLiteral("removeButton"));
     connect(m_addButton, &QPushButton::clicked, this, &EntityEditorPanel::addColumn);
     connect(m_editButton, &QPushButton::clicked, this, &EntityEditorPanel::editColumn);
     connect(m_removeButton, &QPushButton::clicked, this, &EntityEditorPanel::removeColumn);
@@ -148,14 +151,25 @@ void EntityEditorPanel::addColumn()
 {
     if (!m_controller || m_entityId.isNull())
         return;
-    ColumnEditorDialog dialog(this);
-    Column column = dialog.column();
-    if (dialog.exec() != QDialog::Accepted)
-        return;
-    if (column.name.isEmpty())
+
+    const Entity *entity = m_controller->model()->findEntity(m_entityId);
+    if (!entity)
         return;
 
+    QStringList existingNames;
+    for (const Column &column : entity->columns)
+        existingNames.append(column.name);
+
+    ColumnEditorDialog dialog(this);
+    dialog.setExistingNames(existingNames);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    // Read the values AFTER the dialog closes — the pre-exec state is the default.
     const Column built = dialog.column();
+    if (built.name.isEmpty())
+        return;
+
     m_controller->addColumn(m_entityId, built.name, built.type, built.nullable, built.primaryKey,
                             built.unique, built.autoIncrement, built.defaultValue, built.comment);
 }
@@ -174,7 +188,14 @@ void EntityEditorPanel::editColumn()
     if (!existing)
         return;
 
+    QStringList otherNames;
+    for (const Column &column : entity->columns) {
+        if (column.id != columnId)
+            otherNames.append(column.name);
+    }
+
     ColumnEditorDialog dialog(this);
+    dialog.setExistingNames(otherNames);
     dialog.setColumn(*existing);
     if (dialog.exec() != QDialog::Accepted)
         return;

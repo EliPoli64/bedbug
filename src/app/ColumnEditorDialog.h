@@ -6,6 +6,7 @@
 #include <QDialog>
 
 class QComboBox;
+class QFormLayout;
 class QLineEdit;
 class QSpinBox;
 class QCheckBox;
@@ -25,9 +26,23 @@ public:
     void setColumn(const Column &column);
     Column column() const;
 
+    // Names that must not be reused (the entity's other columns). Used by accept().
+    void setExistingNames(const QStringList &names);
+
+    // Returns a non-empty message when the current name is invalid for the given
+    // existing names (empty or duplicate, case-insensitive).
+    QString validationError(const QStringList &existingNames) const;
+
+public slots:
+    void accept() override;
+
 private:
     void updateParameterEdits();
     Column build() const;
+
+    QStringList m_existingNames;
+    QFormLayout *m_form = nullptr;
+    int m_enumRow = -1;
 
     QLineEdit *m_name = nullptr;
     QComboBox *m_kind = nullptr;
