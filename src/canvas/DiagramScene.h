@@ -6,6 +6,7 @@
 #include <QGraphicsScene>
 
 #include <functional>
+#include <optional>
 
 namespace bb {
 
@@ -41,13 +42,20 @@ public:
     bool snapToGrid() const { return m_snapToGrid; }
     void setSnapToGrid(bool enabled) { m_snapToGrid = enabled; }
 
-    // Link mode: clicking a source column then a column on a different entity creates a
-    // relationship via the handler. Esc / toggling off cancels.
-    void setLinkMode(bool enabled);
-    bool linkMode() const { return m_linkMode; }
+    // Relationship tools (MySQL Workbench style): selecting a tool arms link mode for
+    // relationship creation; std::nullopt disarms it. Esc cancels.
+    void setLinkTool(std::optional<RelationshipKind> tool);
+    std::optional<RelationshipKind> linkTool() const { return m_linkTool; }
+
+    // Optional arrowhead at the parent end of every relationship edge.
+    bool pointedLines() const { return m_pointedLines; }
+    void setPointedLines(bool enabled) { m_pointedLines = enabled; }
+
+    // Called by the shell whenever a relationship should be created from link mode.
     void setRelationshipCreationHandler(
         std::function<void(const Id &childEntityId, const QList<Id> &childColumnIds,
-                           const Id &parentEntityId, const QList<Id> &parentColumnIds)>
+                           const Id &parentEntityId, const QList<Id> &parentColumnIds,
+                           RelationshipKind kind)>
             handler);
 
     // Processes one link-mode click at a scene position. Returns true when handled.
@@ -77,10 +85,12 @@ private:
     QHash<Id, RelationshipItem *> m_relationshipItems;
     bool m_snapToGrid = false;   // Workbench-like free dragging by default
 
-    bool m_linkMode = false;
+    std::optional<RelationshipKind> m_linkTool;
+    bool m_pointedLines = false;
     Id m_linkSourceEntity;
     Id m_linkSourceColumn;
-    std::function<void(const Id &, const QList<Id> &, const Id &, const QList<Id> &)>
+    std::function<void(const Id &, const QList<Id> &, const Id &, const QList<Id> &,
+                       RelationshipKind)>
         m_relationshipHandler;
 };
 

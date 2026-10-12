@@ -38,6 +38,8 @@ private slots:
     void removeColumn_removesRelationshipsAndIndexes();
     void columnCrud_addUpdateRemove();
     void duplicateColumnNamesRejected();
+    void createManyToMany_buildsJunction();
+    void addRelationshipOneToOne_marksChildUnique();
 };
 
 void DocumentControllerTest::addRelationship_linksTables()
@@ -235,6 +237,64 @@ void DocumentControllerTest::duplicateColumnNamesRejected()
     renamed.name = QStringLiteral("public_email");
     QVERIFY(controller.updateColumn(entityId, renamed));
     QCOMPARE(controller.model()->findEntity(entityId)->columns.size(), 2);
+}
+
+void DocumentControllerTest::createManyToMany_buildsJunction()
+{
+    DocumentController controller;
+    const Id leftId = controller.addEntity(QStringLiteral("orders"))->id;
+    const Id rightId = controller.addEntity(QStringLiteral("products"))->id;
+
+    Entity *left = byId(controller.model(), leftId);
+    Entity *right = byId(controller.model(), rightId);
+    Column leftPk = makeColumn("0e000000-0000-0000-0000-000000000001", "id");
+    leftPk.primaryKey = true;
+    Column rightPk = makeColumn("0e000000-0000-0000-0000-000000000002", "id");
+    rightPk.primaryKey = true;
+    left->columns.append(leftPk);
+    right->columns.append(rightPk);
+    QCOMPARE(controller.activeDiagram()->nodes.size(), 2);
+
+    Entity *junction = controller.createManyToMany(leftId, rightId);
+    QVERIFY(junction);
+    QCOMPARE(junction->name, QStringLiteral("orders_products"));
+    QCOMPARE(junction->columns.size(), 2);
+    QVERIFY(junction->columns.at(0).primaryKey);
+    QVERIFY(junction->columns.at(1).primaryKey);
+    QCOMPARE(junction->columns.at(0).name, QStringLiteral("orders_id"));
+    QCOMPARE(junction->columns.at(1).name, QStringLiteral("products_id"));
+
+    QCOMPARE(controller.model()->entities.size(), 3);
+    QCOMPARE(controller.model()->relationships.size(), 2);
+    for (const Relationship &relationship : controller.model()->relationships)
+        QVERIFY(relationship.identifying);
+    QCOMPARE(controller.activeDiagram()->nodes.size(), 3);
+
+    // Same table for both sides is invalid.
+    QVERIFY(!controller.createManyToMany(leftId, leftId));
+}
+
+void DocumentControllerTest::addRelationshipOneToOne_marksChildUnique()
+{
+    DocumentController controller;
+    const Id parentId = controller.addEntity(QStringLiteral("customer"))->id;
+    const Id childId = controller.addEntity(QStringLiteral("passport"))->id;
+
+    Entity *parent = byId(controller.model(), parentId);
+    Entity *child = byId(controller.model(), childId);
+    Column parentPk = makeColumn("0f000000-0000-0000-0000-000000000001", "id");
+    parentPk.primaryKey = true;
+    Column childFk = makeColumn("0f000000-0000-0000-0000-000000000002", "customer_id");
+    parent->columns.append(parentPk);
+    child->columns.append(childFk);
+    QVERIFY(!child->columns.first().unique);
+
+    Relationship *relationship =
+        controller.addRelationship(RelationshipKind::OneToOne, childId, {childFk.id}, parentId,
+                                   {parentPk.id});
+    QVERIFY(relationship);
+    QVERIFY(relationship->identifying);
+    QVERIFY(child->columns.first().unique);
 }
 
 QTEST_APPLESS_MAIN(DocumentControllerTest)

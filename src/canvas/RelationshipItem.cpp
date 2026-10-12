@@ -6,6 +6,7 @@
 
 #include <QPainter>
 #include <QPainterPathStroker>
+#include <QPolygonF>
 #include <QStyleOptionGraphicsItem>
 #include <QVector>
 
@@ -113,7 +114,21 @@ void RelationshipItem::refresh()
         }
     }
 
-    const qreal childTrim = CrowsFootPainter::markerZoneLength(Cardinality::Many, m_childOptional);
+    // Cardinality on the child end: all FK columns unique (1:1) -> a "one" marker,
+    // otherwise the crow's foot (1:N).
+    m_childCardinality = Cardinality::Many;
+    for (const Id &columnId : relationship->childColumns) {
+        const Column *column = childItem->entity()->findColumn(columnId);
+        if (!column || !column->unique) {
+            m_childCardinality = Cardinality::Many;
+            break;
+        }
+        m_childCardinality = Cardinality::One;   // still one when the loop finishes
+    }
+
+    m_identifying = relationship->identifying;
+
+    const qreal childTrim = CrowsFootPainter::markerZoneLength(m_childCardinality, m_childOptional);
     const qreal parentTrim = CrowsFootPainter::markerZoneLength(Cardinality::One, false);
 
     m_outwardFromChild = normalizedDelta(points.first(), points.value(1));
@@ -124,6 +139,16 @@ void RelationshipItem::refresh()
         points[0] = points.first() + m_outwardFromChild * childTrim;
     if (!m_outwardFromParent.isNull())
         points[points.size() - 1] = points.last() + m_outwardFromParent * parentTrim;
+
+    // Direction arrow for "pointed" lines sits mid-way along the trimmed final segment.
+    m_arrowPos = QPointF();
+    if (m_scene && m_scene->pointedLines() && points.size() >= 2
+        && !m_outwardFromParent.isNull()) {
+        const QPointF lastBefore = points.at(points.size() - 2);
+        const QPointF trimmedEnd = points.last();
+        m_arrowPos = (lastBefore + trimmedEnd) / 2.0;
+        m_arrowDir = normalizedDelta(lastBefore, trimmedEnd);
+    }
 
     QPainterPath path(points.first());
     for (int i = 1; i < points.size(); ++i)
@@ -160,14 +185,31 @@ void RelationshipItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
     QPen pen(color, selected ? 2.2 : 1.4);
     pen.setJoinStyle(Qt::RoundJoin);   // smooth rounded turns at route corners
     pen.setCapStyle(Qt::RoundCap);
+    // Identifying relationships are solid; non-identifying are dashed.
+    if (!selected && !m_identifying)
+        pen.setStyle(Qt::DashLine);
     painter->setPen(pen);
     painter->setBrush(Qt::NoBrush);
     painter->drawPath(m_path);
 
-    CrowsFootPainter::paint(painter, m_childAnchor, m_outwardFromChild, Cardinality::Many,
+    CrowsFootPainter::paint(painter, m_childAnchor, m_outwardFromChild, m_childCardinality,
                             m_childOptional);
     CrowsFootPainter::paint(painter, m_parentAnchor, m_outwardFromParent, Cardinality::One,
                             false);
+
+    // Optional direction arrow for "pointed" lines.
+    if (!m_arrowPos.isNull() && !m_arrowDir.isNull() && !selected) {
+        const QPointF perp(-m_arrowDir.y(), m_arrowDir.x());
+        const qreal arrowLength = 9.0;
+        const qreal arrowHalfWidth = 3.2;
+        const QPointF base = m_arrowPos - m_arrowDir * arrowLength;
+        const QPointF tip = m_arrowPos + m_arrowDir * arrowLength;
+        QPolygonF arrow;
+        arrow << base + perp * arrowHalfWidth << tip << base - perp * arrowHalfWidth;
+        painter->setPen(Qt::NoPen);
+        painter->setBrush(color);
+        painter->drawPolygon(arrow);
+    }
 }
 
 } // namespace bb

@@ -11,12 +11,15 @@
 #include <QApplication>
 #include <QDockWidget>
 #include <QInputDialog>
+#include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QShortcut>
 #include <QStatusBar>
 #include <QToolBar>
+
+#include <optional>
 
 namespace bb {
 
@@ -52,13 +55,17 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_scene, &DiagramScene::linkStatusChanged, this, [this](const QString &text) {
         statusBar()->showMessage(text);
     });
-    m_scene->setRelationshipCreationHandler([this](const Id &childEntityId,
-                                                   const QList<Id> &childColumnIds,
-                                                   const Id &parentEntityId,
-                                                   const QList<Id> &parentColumnIds) {
-        m_document->addRelationship(childEntityId, childColumnIds, parentEntityId,
-                                    parentColumnIds);
-    });
+    m_scene->setRelationshipCreationHandler(
+        [this](const Id &childEntityId, const QList<Id> &childColumnIds,
+               const Id &parentEntityId, const QList<Id> &parentColumnIds,
+               RelationshipKind kind) {
+            if (kind == RelationshipKind::ManyToMany) {
+                m_document->createManyToMany(childEntityId, parentEntityId);
+            } else {
+                m_document->addRelationship(kind, childEntityId, childColumnIds, parentEntityId,
+                                            parentColumnIds);
+            }
+        });
     connect(m_scene, &QGraphicsScene::selectionChanged, this, [this] {
         statusBar()->showMessage(QString());
         m_entityPanel->showEntity(selectedEntityId(m_scene));
@@ -73,8 +80,10 @@ MainWindow::MainWindow(QWidget *parent)
 
     auto *escShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
     connect(escShortcut, &QShortcut::activated, this, [this] {
-        if (m_linkAction->isChecked())
-            m_linkAction->setChecked(false);
+        for (QAction *action : {m_oneToOneAction, m_oneToManyAction, m_manyToManyAction}) {
+            if (action->isChecked())
+                action->setChecked(false);
+        }
     });
 
     updateStatusMessage();
@@ -86,14 +95,42 @@ void MainWindow::createActions()
     m_addTableAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
     m_addTableAction->setStatusTip(tr("Create a new table on the canvas"));
     connect(m_addTableAction, &QAction::triggered, this, [this] {
-        Entity *entity = m_document->addEntity(QStringLiteral("table"));
+        bool ok = false;
+        const QString name = QInputDialog::getText(this, tr("Add Table"), tr("Table name:"),
+                                                   QLineEdit::Normal, QStringLiteral("table"), &ok);
+        if (!ok || name.trimmed().isEmpty())
+            return;
+        Entity *entity = m_document->addEntity(name.trimmed());
         m_pendingSelect = entity ? entity->id : Id();
     });
 
-    m_linkAction = new QAction(tr("Link Mode"), this);
-    m_linkAction->setCheckable(true);
-    m_linkAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_L));
-    connect(m_linkAction, &QAction::toggled, m_scene, &DiagramScene::setLinkMode);
+    // Relationship tools (MySQL Workbench style): 1:1, 1:N, N:M. One is active at a time.
+    auto makeRelationshipTool = [this](const QString &label, RelationshipKind kind,
+                                       const QKeySequence &shortcut = QKeySequence()) {
+        auto *action = new QAction(label, this);
+        action->setCheckable(true);
+        action->setShortcut(shortcut);
+        connect(action, &QAction::toggled, this, [this, kind](bool checked) {
+            m_scene->setLinkTool(checked ? std::make_optional(kind) : std::nullopt);
+        });
+        return action;
+    };
+    m_oneToOneAction = makeRelationshipTool(tr("1:1"), RelationshipKind::OneToOne);
+    m_oneToManyAction =
+        makeRelationshipTool(tr("1:N"), RelationshipKind::OneToMany, QKeySequence(Qt::CTRL | Qt::Key_L));
+    m_manyToManyAction = makeRelationshipTool(tr("N:M"), RelationshipKind::ManyToMany);
+
+    auto *relationshipGroup = new QActionGroup(this);
+    relationshipGroup->setExclusionPolicy(QActionGroup::ExclusionPolicy::ExclusiveOptional);
+    relationshipGroup->addAction(m_oneToOneAction);
+    relationshipGroup->addAction(m_oneToManyAction);
+    relationshipGroup->addAction(m_manyToManyAction);
+
+    m_pointedAction = new QAction(tr("Pointed Lines"), this);
+    m_pointedAction->setCheckable(true);
+    m_pointedAction->setStatusTip(
+        tr("Draw a direction arrow at the parent end of relationship edges"));
+    connect(m_pointedAction, &QAction::toggled, m_scene, &DiagramScene::setPointedLines);
 
     m_zoomInAction = new QAction(tr("Zoom In"), this);
     m_zoomInAction->setShortcut(QKeySequence::ZoomIn);
@@ -119,7 +156,12 @@ void MainWindow::createToolBars()
     toolBar->setObjectName(QStringLiteral("mainToolBar"));
     toolBar->setMovable(false);
     toolBar->addAction(m_addTableAction);
-    toolBar->addAction(m_linkAction);
+    toolBar->addSeparator();
+    toolBar->addAction(m_oneToOneAction);
+    toolBar->addAction(m_oneToManyAction);
+    toolBar->addAction(m_manyToManyAction);
+    toolBar->addSeparator();
+    toolBar->addAction(m_pointedAction);
     toolBar->addSeparator();
     toolBar->addAction(m_zoomInAction);
     toolBar->addAction(m_zoomOutAction);
@@ -137,7 +179,12 @@ void MainWindow::createMenus()
 
     QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
     editMenu->addAction(m_addTableAction);
-    editMenu->addAction(m_linkAction);
+    editMenu->addSeparator();
+    editMenu->addAction(m_oneToOneAction);
+    editMenu->addAction(m_oneToManyAction);
+    editMenu->addAction(m_manyToManyAction);
+    editMenu->addSeparator();
+    editMenu->addAction(m_pointedAction);
 
     QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
     viewMenu->addAction(m_zoomInAction);
@@ -261,7 +308,7 @@ void MainWindow::showTableContextMenu(const Id &entityId, const QPoint &globalPo
             m_document->renameEntity(entityId, name);
     } else if (chosen == link) {
         focusEntity(entityId);
-        m_linkAction->setChecked(true);
+        m_oneToManyAction->setChecked(true);
     } else if (chosen == editColumns) {
         focusEntity(entityId);
     } else if (chosen == remove) {

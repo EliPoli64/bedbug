@@ -65,25 +65,50 @@ RelationshipItem *DiagramScene::itemForRelationship(const Id &relationshipId) co
     return m_relationshipItems.value(relationshipId, nullptr);
 }
 
-void DiagramScene::setLinkMode(bool enabled)
+void DiagramScene::setLinkTool(std::optional<RelationshipKind> tool)
 {
-    if (m_linkMode == enabled)
+    if (m_linkTool == tool)
         return;
-    m_linkMode = enabled;
+    m_linkTool = tool;
     m_linkSourceEntity = Id();
     m_linkSourceColumn = Id();
-    emit linkStatusChanged(enabled ? tr("Link mode: click a source column, then a target column")
-                                   : QString());
+
+    if (m_linkTool.has_value()) {
+        const char *label = nullptr;
+        switch (*m_linkTool) {
+        case RelationshipKind::OneToOne:
+            label = "1:1";
+            break;
+        case RelationshipKind::OneToMany:
+            label = "1:N";
+            break;
+        case RelationshipKind::ManyToMany:
+            label = "N:M";
+            break;
+        }
+        emit linkStatusChanged(tr("%1 relationship tool: click a source column, then a target "
+                                  "column on another table")
+                                   .arg(QLatin1String(label)));
+    } else {
+        m_linkSourceEntity = Id();
+        m_linkSourceColumn = Id();
+        emit linkStatusChanged(QString());
+    }
 }
 
 void DiagramScene::setRelationshipCreationHandler(
-    std::function<void(const Id &, const QList<Id> &, const Id &, const QList<Id> &)> handler)
+    std::function<void(const Id &, const QList<Id> &, const Id &, const QList<Id> &,
+                       RelationshipKind)>
+        handler)
 {
     m_relationshipHandler = std::move(handler);
 }
 
 void DiagramScene::beginOrCompleteLink(const Id &entityId, const Id &columnId)
 {
+    if (!m_linkTool.has_value())
+        return;
+
     if (m_linkSourceEntity.isNull()) {
         m_linkSourceEntity = entityId;
         m_linkSourceColumn = columnId;
@@ -93,8 +118,8 @@ void DiagramScene::beginOrCompleteLink(const Id &entityId, const Id &columnId)
                 if (const Column *column = entity->findColumn(columnId))
                     label = QStringLiteral("%1.%2").arg(entity->name, column->name);
         }
-        emit linkStatusChanged(tr("Source %1 — now click a target column on another table")
-                                   .arg(label));
+        emit linkStatusChanged(
+            tr("Source %1 — now click a target column on another table").arg(label));
         return;
     }
 
@@ -112,14 +137,14 @@ void DiagramScene::beginOrCompleteLink(const Id &entityId, const Id &columnId)
     m_linkSourceColumn = Id();
 
     if (m_relationshipHandler) {
-        m_relationshipHandler(childEntity, {childColumn}, entityId, {columnId});
+        m_relationshipHandler(childEntity, {childColumn}, entityId, {columnId}, *m_linkTool);
         emit linkStatusChanged(tr("Relationship created"));
     }
 }
 
 bool DiagramScene::handleLinkAt(const QPointF &scenePos)
 {
-    if (!m_linkMode)
+    if (!m_linkTool.has_value())
         return false;
 
     EntityItem *entityItem = nullptr;
@@ -175,7 +200,7 @@ void DiagramScene::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
 
 void DiagramScene::mousePressEvent(QGraphicsSceneMouseEvent *event)
 {
-    if (m_linkMode && event->button() == Qt::LeftButton) {
+    if (m_linkTool.has_value() && event->button() == Qt::LeftButton) {
         handleLinkAt(event->scenePos());
         event->accept();
         return;

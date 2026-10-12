@@ -2,6 +2,7 @@
 
 #include "DiagramScene.h"
 
+#include <QContextMenuEvent>
 #include <QKeyEvent>
 #include <QMouseEvent>
 #include <QPainter>
@@ -103,11 +104,32 @@ void DiagramView::mousePressEvent(QMouseEvent *event)
         event->accept();
         return;
     }
+
+    // Right-drag pans the canvas. A right click without movement still opens the table
+    // context menu (synthesized on release below).
+    if (event->button() == Qt::RightButton) {
+        m_rightPanning = true;
+        m_rightMoved = false;
+        m_rightPressPos = event->pos();
+        m_lastPan = event->pos();
+        viewport()->setCursor(Qt::ClosedHandCursor);
+        event->accept();
+        return;
+    }
+
     QGraphicsView::mousePressEvent(event);
 }
 
 void DiagramView::mouseMoveEvent(QMouseEvent *event)
 {
+    if (m_rightPanning) {
+        if ((event->pos() - m_rightPressPos).manhattanLength() > 3)
+            m_rightMoved = true;
+        panBy(event->pos() - m_lastPan);
+        m_lastPan = event->pos();
+        event->accept();
+        return;
+    }
     if (m_panning) {
         panBy(event->pos() - m_lastPan);
         m_lastPan = event->pos();
@@ -119,6 +141,19 @@ void DiagramView::mouseMoveEvent(QMouseEvent *event)
 
 void DiagramView::mouseReleaseEvent(QMouseEvent *event)
 {
+    if (m_rightPanning && event->button() == Qt::RightButton) {
+        m_rightPanning = false;
+        viewport()->setCursor(Qt::ArrowCursor);
+        if (!m_rightMoved) {
+            // Deliver the context menu ourselves (press was consumed for panning).
+            m_contextMenuSynthesized = true;
+            QContextMenuEvent menuEvent(QContextMenuEvent::Mouse, event->pos(),
+                                        event->globalPosition().toPoint());
+            contextMenuEvent(&menuEvent);
+        }
+        event->accept();
+        return;
+    }
     if (m_panning && (event->button() == Qt::MiddleButton || event->button() == Qt::LeftButton)) {
         m_panning = false;
         viewport()->setCursor(Qt::ArrowCursor);
@@ -126,6 +161,21 @@ void DiagramView::mouseReleaseEvent(QMouseEvent *event)
         return;
     }
     QGraphicsView::mouseReleaseEvent(event);
+}
+
+void DiagramView::contextMenuEvent(QContextMenuEvent *event)
+{
+    // Swallow the platform-generated event for the interaction we already handled.
+    if (m_contextMenuSynthesized) {
+        m_contextMenuSynthesized = false;
+        event->accept();
+        return;
+    }
+    if (m_rightPanning) {
+        event->accept();
+        return;
+    }
+    QGraphicsView::contextMenuEvent(event);
 }
 
 void DiagramView::panBy(const QPoint &delta)

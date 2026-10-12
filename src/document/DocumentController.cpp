@@ -16,6 +16,30 @@ bool columnsBelongTo(const Model &model, const Id &entityId, const QList<Id> &co
     return true;
 }
 
+QString sanitizeTableName(const QString &name)
+{
+    QString out;
+    for (const QChar &c : name.toLower()) {
+        const bool alnum = (c >= QLatin1Char('a') && c <= QLatin1Char('z'))
+                           || (c >= QLatin1Char('0') && c <= QLatin1Char('9'));
+        out += alnum ? c : QLatin1Char('_');
+    }
+    while (out.startsWith(QLatin1Char('_')))
+        out.remove(0, 1);
+    while (out.endsWith(QLatin1Char('_')))
+        out.chop(1);
+    return out;
+}
+
+const Column *primaryColumnOrFirst(const Entity &entity)
+{
+    for (const Column &column : entity.columns) {
+        if (column.primaryKey)
+            return &column;
+    }
+    return entity.columns.isEmpty() ? nullptr : &entity.columns.first();
+}
+
 } // namespace
 
 DocumentController::DocumentController(QObject *parent)
@@ -73,6 +97,18 @@ Relationship *DocumentController::addRelationship(const Id &childEntityId,
                                                   const QList<Id> &parentColumnIds,
                                                   const QString &name)
 {
+    return addRelationship(RelationshipKind::OneToMany, childEntityId, childColumnIds,
+                           parentEntityId, parentColumnIds, name);
+}
+
+Relationship *DocumentController::addRelationship(RelationshipKind kind, const Id &childEntityId,
+                                                  const QList<Id> &childColumnIds,
+                                                  const Id &parentEntityId,
+                                                  const QList<Id> &parentColumnIds,
+                                                  const QString &name)
+{
+    if (kind == RelationshipKind::ManyToMany)
+        return nullptr;
     if (childEntityId == parentEntityId)
         return nullptr;
     if (childColumnIds.isEmpty() || parentColumnIds.isEmpty())
@@ -82,12 +118,23 @@ Relationship *DocumentController::addRelationship(const Id &childEntityId,
     if (!columnsBelongTo(m_model, parentEntityId, parentColumnIds))
         return nullptr;
 
+    // 1:1 relationships are enforced by a unique constraint on the child FK column(s).
+    if (kind == RelationshipKind::OneToOne) {
+        if (Entity *child = m_model.findEntity(childEntityId)) {
+            for (const Id &columnId : childColumnIds) {
+                if (Column *column = child->findColumn(columnId))
+                    column->unique = true;
+            }
+        }
+    }
+
     Relationship relationship;
     relationship.id = Id::create();
     relationship.childEntity = childEntityId;
     relationship.childColumns = childColumnIds;
     relationship.parentEntity = parentEntityId;
     relationship.parentColumns = parentColumnIds;
+    relationship.identifying = (kind == RelationshipKind::OneToOne);
 
     if (name.isEmpty()) {
         const Entity *child = m_model.findEntity(childEntityId);
@@ -240,6 +287,90 @@ bool DocumentController::updateColumn(const Id &entityId, const Column &column)
         }
     }
     return false;
+}
+
+Entity *DocumentController::createManyToMany(const Id &leftEntityId, const Id &rightEntityId)
+{
+    Entity *left = m_model.findEntity(leftEntityId);
+    Entity *right = m_model.findEntity(rightEntityId);
+    if (!left || !right || leftEntityId == rightEntityId)
+        return nullptr;
+
+    const Column *leftRef = primaryColumnOrFirst(*left);
+    const Column *rightRef = primaryColumnOrFirst(*right);
+    if (!leftRef || !rightRef)
+        return nullptr;
+
+    const QString leftName = sanitizeTableName(left->name);
+    const QString rightName = sanitizeTableName(right->name);
+    if (leftName.isEmpty() || rightName.isEmpty())
+        return nullptr;
+
+    // Junction table: composite PK made of the two FKs.
+    Entity junction;
+    junction.id = Id::create();
+    junction.name = leftName + QLatin1Char('_') + rightName;
+    junction.schema = left->schema;
+
+    Column leftColumn;
+    leftColumn.id = Id::create();
+    leftColumn.name = leftName + QStringLiteral("_id");
+    leftColumn.type = leftRef->type;
+    leftColumn.nullable = false;
+    leftColumn.primaryKey = true;
+
+    Column rightColumn;
+    rightColumn.id = Id::create();
+    rightColumn.name = rightName + QStringLiteral("_id");
+    rightColumn.type = rightRef->type;
+    rightColumn.nullable = false;
+    rightColumn.primaryKey = true;
+
+    junction.columns = {leftColumn, rightColumn};
+    m_model.entities.append(junction);
+
+    Relationship leftFk;
+    leftFk.id = Id::create();
+    leftFk.name = QStringLiteral("fk_%1_%2").arg(junction.name, leftName);
+    leftFk.identifying = true;
+    leftFk.childEntity = junction.id;
+    leftFk.childColumns = {leftColumn.id};
+    leftFk.parentEntity = leftEntityId;
+    leftFk.parentColumns = {leftRef->id};
+    m_model.relationships.append(leftFk);
+
+    Relationship rightFk;
+    rightFk.id = Id::create();
+    rightFk.name = QStringLiteral("fk_%1_%2").arg(junction.name, rightName);
+    rightFk.identifying = true;
+    rightFk.childEntity = junction.id;
+    rightFk.childColumns = {rightColumn.id};
+    rightFk.parentEntity = rightEntityId;
+    rightFk.parentColumns = {rightRef->id};
+    m_model.relationships.append(rightFk);
+
+    // Place the junction between its two parents.
+    if (Diagram *diagram = activeDiagram()) {
+        QPointF leftPos;
+        QPointF rightPos;
+        for (const DiagramNode &node : diagram->nodes) {
+            if (node.entity == leftEntityId)
+                leftPos = node.pos;
+            else if (node.entity == rightEntityId)
+                rightPos = node.pos;
+        }
+        if (leftPos.isNull() && rightPos.isNull()) {
+            leftPos = QPointF(200, 200);
+            rightPos = QPointF(200, 200);
+        }
+        DiagramNode node;
+        node.entity = junction.id;
+        node.pos = (leftPos + rightPos) / 2.0 + QPointF(24, 24);
+        diagram->nodes.append(node);
+    }
+
+    emit modelChanged();
+    return &m_model.entities.last();
 }
 
 } // namespace bb

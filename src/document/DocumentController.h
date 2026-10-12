@@ -29,10 +29,20 @@ public:
 
     // Creates a foreign-key relationship between columns of two distinct entities and
     // emits modelChanged(). Returns nullptr when either entity or any column is unknown,
-    // or when both sides live on the same entity.
+    // when both sides live on the same entity, or when the kind is ManyToMany.
+    Relationship *addRelationship(RelationshipKind kind, const Id &childEntityId,
+                                  const QList<Id> &childColumnIds, const Id &parentEntityId,
+                                  const QList<Id> &parentColumnIds, const QString &name = {});
+
+    // Convenience for OneToMany relationships.
     Relationship *addRelationship(const Id &childEntityId, const QList<Id> &childColumnIds,
                                   const Id &parentEntityId, const QList<Id> &parentColumnIds,
                                   const QString &name = {});
+
+    // Builds a junction table ("left_right") with a composite PK of two FKs to both
+    // tables, places it between them on the diagram, and emits modelChanged(). Returns
+    // nullptr when either table is missing or has no referenceable columns.
+    Entity *createManyToMany(const Id &leftEntityId, const Id &rightEntityId);
 
     // Removes an entity, all its diagram nodes, and every relationship touching it.
     bool removeEntity(const Id &entityId);

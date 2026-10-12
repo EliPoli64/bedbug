@@ -117,6 +117,8 @@ private slots:
     void relationshipItem_rendersAndRefreshesOnMove();
     void relationshipItem_skipped_whenEntityNotOnDiagram();
     void linkMode_clicksCreateRelationship();
+    void linkTool_oneToOneFlowsThrough();
+    void relationshipItem_cardinalityDerivedFromUniqueness();
     void contextMenu_onTableEmitsRequest();
     void crowsfoot_markersRenderDistinctly();
 };
@@ -352,21 +354,24 @@ void CanvasTest::linkMode_clicksCreateRelationship()
     scene.setSnapToGrid(false);
     scene.syncFromModel();
 
+    RelationshipKind createdKind = RelationshipKind::OneToMany;
     bool called = false;
     Id childId, parentId;
     QList<Id> childColumns, parentColumns;
     scene.setRelationshipCreationHandler(
         [&](const Id &child, const QList<Id> &childCols, const Id &parent,
-            const QList<Id> &parentCols) {
+            const QList<Id> &parentCols, RelationshipKind kind) {
             called = true;
             childId = child;
             childColumns = childCols;
             parentId = parent;
             parentColumns = parentCols;
+            createdKind = kind;
         });
 
-    scene.setLinkMode(true);
-    QVERIFY(scene.linkMode());
+    scene.setLinkTool(std::make_optional(RelationshipKind::OneToMany));
+    QVERIFY(scene.linkTool().has_value());
+    QVERIFY(*scene.linkTool() == RelationshipKind::OneToMany);
 
     const Entity &customer = model->entities.at(0);
     const Entity &orders = model->entities.at(1);
@@ -392,8 +397,70 @@ void CanvasTest::linkMode_clicksCreateRelationship()
     QCOMPARE(childColumns, QList<Id>{fk->id});
     QCOMPARE(parentId, customer.id);
     QCOMPARE(parentColumns, QList<Id>{pk->id});
+    QVERIFY(createdKind == RelationshipKind::OneToMany);
 
     delete model;
+}
+
+void CanvasTest::linkTool_oneToOneFlowsThrough()
+{
+    Model *model = new Model(twoEntitySceneModel());
+    DiagramScene scene;
+    scene.setModel(model);
+    scene.setActiveDiagramId(model->diagrams.first().id);
+    scene.syncFromModel();
+
+    RelationshipKind createdKind = RelationshipKind::OneToMany;
+    scene.setRelationshipCreationHandler(
+        [&](const Id &, const QList<Id> &, const Id &, const QList<Id> &, RelationshipKind kind) {
+            createdKind = kind;
+        });
+
+    scene.setLinkTool(std::make_optional(RelationshipKind::OneToOne));
+    const Entity &customer = model->entities.at(0);
+    const Entity &orders = model->entities.at(1);
+    EntityItem *ordersItem = scene.itemForEntity(orders.id);
+    EntityItem *customerItem = scene.itemForEntity(customer.id);
+
+    const qreal childRowY = EntityItem::kHeaderHeight + 1 * EntityItem::kRowHeight
+                            + EntityItem::kRowHeight / 2.0;
+    const qreal parentRowY = EntityItem::kHeaderHeight + EntityItem::kRowHeight / 2.0;
+    scene.handleLinkAt(ordersItem->mapToScene(QPointF(10, childRowY)));
+    scene.handleLinkAt(customerItem->mapToScene(QPointF(10, parentRowY)));
+    QVERIFY(createdKind == RelationshipKind::OneToOne);
+
+    scene.setLinkTool(std::nullopt);
+    QVERIFY(!scene.linkTool().has_value());
+
+    delete model;
+}
+
+void CanvasTest::relationshipItem_cardinalityDerivedFromUniqueness()
+{
+    Model model = twoEntityConnectedModel();
+    DiagramScene scene;
+    scene.setModel(&model);
+    scene.setActiveDiagramId(model.diagrams.first().id);
+    scene.syncFromModel();
+
+    const Id relationshipId = model.relationships.first().id;
+    RelationshipItem *item = scene.itemForRelationship(relationshipId);
+    QVERIFY(item);
+
+    // customer_id is not unique -> crow's foot at the child end.
+    QVERIFY(item->childCardinality() == Cardinality::Many);
+
+    // Make it unique (1:1) -> both ends render as "one".
+    const Relationship &relationship = model.relationships.first();
+    const Id fkColumnId = relationship.childColumns.first();
+    model.findEntity(relationship.childEntity)->findColumn(fkColumnId)->unique = true;
+    item->refresh();
+    QVERIFY(item->childCardinality() == Cardinality::One);
+
+    // Toggling pointed lines must not break refresh.
+    scene.setPointedLines(true);
+    item->refresh();
+    QVERIFY(item->isVisible());
 }
 
 void CanvasTest::contextMenu_onTableEmitsRequest()

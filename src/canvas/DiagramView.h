@@ -26,6 +26,7 @@ protected:
     void mousePressEvent(QMouseEvent *event) override;
     void mouseMoveEvent(QMouseEvent *event) override;
     void mouseReleaseEvent(QMouseEvent *event) override;
+    void contextMenuEvent(QContextMenuEvent *event) override;
     void drawBackground(QPainter *painter, const QRectF &rect) override;
 
 private:
@@ -34,6 +35,11 @@ private:
     bool m_panArmed = false;  // space bar held: left-drag pans
     bool m_panning = false;
     QPoint m_lastPan;
+
+    bool m_rightPanning = false;   // right-drag pans the canvas
+    QPoint m_rightPressPos;
+    bool m_rightMoved = false;
+    bool m_contextMenuSynthesized = false;
 };
 
 } // namespace bb

@@ -36,7 +36,10 @@ private:
     DiagramView *m_view = nullptr;
     EntityEditorPanel *m_entityPanel = nullptr;
     QAction *m_addTableAction = nullptr;
-    QAction *m_linkAction = nullptr;
+    QAction *m_oneToOneAction = nullptr;
+    QAction *m_oneToManyAction = nullptr;
+    QAction *m_manyToManyAction = nullptr;
+    QAction *m_pointedAction = nullptr;
     QAction *m_zoomInAction = nullptr;
     QAction *m_zoomOutAction = nullptr;
     QAction *m_fitAction = nullptr;
