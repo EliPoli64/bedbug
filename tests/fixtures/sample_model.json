@@ -1,0 +1,171 @@
+{
+  "formatVersion": "1",
+  "model": {
+    "name": "Sales",
+    "preferredDialect": "postgres"
+  },
+  "entities": [
+    {
+      "id": "aa000000-0000-0000-0000-000000000001",
+      "name": "customer",
+      "schema": "public",
+      "comment": "Customer master data.",
+      "columns": [
+        {
+          "id": "aa000000-0000-0000-0000-000000000101",
+          "name": "id",
+          "type": { "kind": "BigInt" },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "autoIncrement": true
+        },
+        {
+          "id": "aa000000-0000-0000-0000-000000000102",
+          "name": "email",
+          "type": { "kind": "Varchar", "length": 255 },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": true,
+          "autoIncrement": false
+        },
+        {
+          "id": "aa000000-0000-0000-0000-000000000103",
+          "name": "status",
+          "type": { "kind": "Enum", "enumValues": ["active", "inactive", "banned"] },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "'active'",
+          "comment": "Account lifecycle state."
+        },
+        {
+          "id": "aa000000-0000-0000-0000-000000000104",
+          "name": "balance",
+          "type": { "kind": "Decimal", "precision": 10, "scale": 2 },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false
+        },
+        {
+          "id": "aa000000-0000-0000-0000-000000000105",
+          "name": "data",
+          "type": { "kind": "Json" },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "dialectOverrides": { "sqlserver": "nvarchar(max)" },
+          "nativeType": { "rawType": "jsonb", "engine": "postgres" }
+        },
+        {
+          "id": "aa000000-0000-0000-0000-000000000106",
+          "name": "public_id",
+          "type": { "kind": "Uuid" },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false
+        },
+        {
+          "id": "aa000000-0000-0000-0000-000000000107",
+          "name": "bio",
+          "type": { "kind": "Text" },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false
+        },
+        {
+          "id": "aa000000-0000-0000-0000-000000000108",
+          "name": "created_at",
+          "type": { "kind": "Timestamp" },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "CURRENT_TIMESTAMP"
+        }
+      ],
+      "indexes": [
+        {
+          "id": "aa000000-0000-0000-0000-000000000301",
+          "name": "ix_customer_created_at",
+          "columnIds": ["aa000000-0000-0000-0000-000000000108"],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "id": "aa000000-0000-0000-0000-000000000002",
+      "name": "orders",
+      "schema": "public",
+      "comment": "",
+      "columns": [
+        {
+          "id": "aa000000-0000-0000-0000-000000000201",
+          "name": "id",
+          "type": { "kind": "BigInt" },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "autoIncrement": true
+        },
+        {
+          "id": "aa000000-0000-0000-0000-000000000202",
+          "name": "customer_id",
+          "type": { "kind": "BigInt" },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false
+        },
+        {
+          "id": "aa000000-0000-0000-0000-000000000203",
+          "name": "total",
+          "type": { "kind": "Decimal", "precision": 12, "scale": 2 },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "0"
+        }
+      ],
+      "indexes": []
+    }
+  ],
+  "relationships": [
+    {
+      "id": "aa000000-0000-0000-0000-000000000401",
+      "name": "fk_orders_customer",
+      "childEntity": "aa000000-0000-0000-0000-000000000002",
+      "childColumns": ["aa000000-0000-0000-0000-000000000202"],
+      "parentEntity": "aa000000-0000-0000-0000-000000000001",
+      "parentColumns": ["aa000000-0000-0000-0000-000000000101"],
+      "identifying": false,
+      "onDelete": "CASCADE",
+      "onUpdate": "RESTRICT"
+    }
+  ],
+  "diagrams": [
+    {
+      "id": "aa000000-0000-0000-0000-000000000501",
+      "name": "Main",
+      "nodes": [
+        { "entity": "aa000000-0000-0000-0000-000000000001", "pos": [40, 80] },
+        { "entity": "aa000000-0000-0000-0000-000000000002", "pos": [320, 80] }
+      ],
+      "zoom": 1.0
+    },
+    {
+      "id": "aa000000-0000-0000-0000-000000000502",
+      "name": "Topology",
+      "nodes": [
+        { "entity": "aa000000-0000-0000-0000-000000000002", "pos": [10, 10] }
+      ],
+      "zoom": 1.5
+    }
+  ]
+}

@@ -1,4 +1,4 @@
-add_executable(bedbug
+qt_add_executable(bedbug
     main.cpp
     MainWindow.cpp
     MainWindow.h
