@@ -1,0 +1,7 @@
+build/
+CMakeFiles/
+cmake-build-*/
+*.o
+*.obj
+*.user
+compile_commands.json
