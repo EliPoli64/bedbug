@@ -44,6 +44,10 @@ struct CanonicalType
 
     // Basic sanity: sized kinds need a length, decimals need precision, enums need values.
     bool isValid() const;
+
+    // Human-facing type string for the canonical type, e.g. "bigint", "varchar(255)",
+    // "decimal(12,2)", "enum".
+    QString displayName() const;
 };
 
 } // namespace bb

@@ -19,10 +19,11 @@ class DiagramScene;
 class EntityItem : public QGraphicsItem
 {
 public:
-    static constexpr qreal kHeaderHeight = 24.0;
-    static constexpr qreal kRowHeight = 18.0;
-    static constexpr qreal kHPadding = 8.0;
-    static constexpr qreal kBadgeWidth = 26.0;
+    static constexpr qreal kHeaderHeight = 26.0;
+    static constexpr qreal kRowHeight = 20.0;
+    static constexpr qreal kHPadding = 10.0;
+    static constexpr qreal kBadgeWidth = 24.0;
+    static constexpr qreal kCornerRadius = 6.0;
 
     explicit EntityItem(const Entity *entity, QGraphicsItem *parent = nullptr);
 

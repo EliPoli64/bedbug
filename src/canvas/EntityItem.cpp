@@ -6,6 +6,7 @@
 #include <QFontMetricsF>
 #include <QGraphicsScene>
 #include <QPainter>
+#include <QPainterPath>
 #include <QPalette>
 #include <QStyleOptionGraphicsItem>
 
@@ -15,25 +16,18 @@ namespace bb {
 
 namespace {
 
-QString columnTypeText(const CanonicalType &type)
+// Header bar with rounded top corners, matching the box's corner radius.
+QPainterPath roundedTopPath(const QRectF &rect, qreal radius)
 {
-    using K = CanonicalType::Kind;
-    switch (type.kind) {
-    case K::Varchar:
-    case K::Char:
-        return type.length > 0
-                   ? CanonicalType::kindToString(type.kind).toLower() + QStringLiteral("(%1)")
-                         .arg(type.length)
-                   : CanonicalType::kindToString(type.kind).toLower();
-    case K::Decimal:
-        return type.precision > 0
-                   ? QStringLiteral("decimal(%1,%2)").arg(type.precision).arg(type.scale)
-                   : QStringLiteral("decimal");
-    case K::Enum:
-        return QStringLiteral("enum");
-    default:
-        return CanonicalType::kindToString(type.kind).toLower();
-    }
+    QPainterPath path;
+    path.moveTo(rect.left(), rect.bottom());
+    path.lineTo(rect.left(), rect.top() + radius);
+    path.quadTo(rect.left(), rect.top(), rect.left() + radius, rect.top());
+    path.lineTo(rect.right() - radius, rect.top());
+    path.quadTo(rect.right(), rect.top(), rect.right(), rect.top() + radius);
+    path.lineTo(rect.right(), rect.bottom());
+    path.closeSubpath();
+    return path;
 }
 
 } // namespace
@@ -42,20 +36,34 @@ EntityItem::EntityItem(const Entity *entity, QGraphicsItem *parent)
     : QGraphicsItem(parent)
     , m_entity(entity)
 {
-    setAcceptedMouseButtons(Qt::LeftButton);
+    setAcceptHoverEvents(true);
+    setCursor(Qt::PointingHandCursor);
+
     if (m_entity) {
         // Measure with the application font, which is what QGraphicsView paints with by
-        // default. (M3 used the library font, causing rows to overflow the box width.)
+        // default.
         QFontMetricsF metrics{QApplication::font()};
+        QFont titleFont = QApplication::font();
+        titleFont.setBold(true);
+        QFontMetricsF titleMetrics{titleFont};
+
         m_width = 180.0;
-        m_width = qMax(m_width, metrics.horizontalAdvance(m_entity->name) + kHPadding * 2);
+        m_width = qMax(m_width, titleMetrics.horizontalAdvance(m_entity->name) + kHPadding * 2);
         for (const Column &column : m_entity->columns) {
-            const qreal rowText = metrics.horizontalAdvance(column.name) + kBadgeWidth
-                                  + metrics.horizontalAdvance(columnTypeText(column.type))
-                                  + kHPadding * 2 + 8.0;
+            const qreal rowText = metrics.horizontalAdvance(column.name)
+                                  + metrics.horizontalAdvance(column.type.displayName())
+                                  + kBadgeWidth + kHPadding * 2 + 12.0;
             m_width = qMax(m_width, rowText);
         }
-        m_width = qMin(m_width, 420.0);
+        m_width = qMin(m_width, 440.0);
+
+        QStringList tooltip;
+        tooltip << m_entity->name;
+        if (!m_entity->schema.isEmpty())
+            tooltip << QStringLiteral("Schema: %1").arg(m_entity->schema);
+        if (!m_entity->comment.isEmpty())
+            tooltip << m_entity->comment;
+        setToolTip(tooltip.join(QLatin1Char('\n')));
     }
 }
 
@@ -67,7 +75,8 @@ qreal EntityItem::contentWidth() const
 QRectF EntityItem::boundingRect() const
 {
     const qreal height = kHeaderHeight + (m_entity ? m_entity->columns.size() : 0) * kRowHeight;
-    return QRectF(0, 0, m_width, height);
+    // Small margin for the selection border and antialiasing.
+    return QRectF(-1, -1, m_width + 2, height + 2);
 }
 
 void EntityItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option, QWidget *)
@@ -75,34 +84,53 @@ void EntityItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option
     if (!m_entity)
         return;
 
-    const QRectF rect = boundingRect();
+    // Use the scene palette (theme-adaptive).
     const QPalette palette = option ? option->palette : QPalette();
-
     const bool selected = option && (option->state & QStyle::State_Selected);
+    const bool hovered = option && (option->state & QStyle::State_MouseOver);
 
-    // Body background.
-    painter->setPen(QPen(palette.color(QPalette::Mid), 1));
-    painter->setBrush(palette.color(QPalette::Base));
-    painter->drawRect(rect);
+    const QRectF rect(0, 0, m_width, kHeaderHeight + m_entity->columns.size() * kRowHeight);
+    const qreal radius = kCornerRadius;
 
-    // Header bar.
-    const QRectF headerRect(0, 0, m_width, kHeaderHeight);
-    painter->fillRect(headerRect, selected ? palette.color(QPalette::Dark)
-                                           : palette.color(QPalette::Highlight));
+    painter->setRenderHint(QPainter::Antialiasing);
+
+    // Box with rounded corners.
+    QColor borderColor = palette.color(QPalette::Mid);
+    if (selected)
+        borderColor = palette.color(QPalette::Highlight);
+    QColor bodyColor = palette.color(QPalette::Base);
+    if (hovered && !selected)
+        bodyColor = bodyColor.darker(104);
+
+    QPainterPath boxPath;
+    boxPath.addRoundedRect(rect, radius, radius);
+    painter->setPen(QPen(borderColor, selected ? 2.0 : 1.0));
+    painter->setBrush(bodyColor);
+    painter->drawPath(boxPath);
+
+    // Header.
+    QColor headerColor = palette.color(QPalette::Highlight);
+    if (selected)
+        headerColor = headerColor.darker(115);
+    else if (hovered)
+        headerColor = headerColor.lighter(108);
+    painter->fillPath(roundedTopPath(QRectF(0, 0, m_width, kHeaderHeight), radius), headerColor);
+
+    QFont titleFont = painter->font();
+    titleFont.setBold(true);
+    titleFont.setPointSizeF(titleFont.pointSizeF() + 1.0);
+    painter->setFont(titleFont);
     painter->setPen(palette.color(QPalette::HighlightedText));
-    QFont headerFont = painter->font();
-    headerFont.setBold(true);
-    painter->setFont(headerFont);
-    painter->drawText(headerRect, Qt::AlignCenter, m_entity->name);
+    painter->drawText(QRectF(0, 0, m_width, kHeaderHeight), Qt::AlignCenter, m_entity->name);
 
-    // Body font (non-bold).
     QFont bodyFont = painter->font();
     bodyFont.setBold(false);
+    bodyFont.setPointSizeF(bodyFont.pointSizeF() - 1.0);
     painter->setFont(bodyFont);
 
     const QFontMetricsF metrics = painter->fontMetrics();
     QColor mutedColor = palette.color(QPalette::WindowText);
-    mutedColor.setAlpha(140);
+    mutedColor.setAlpha(150);
 
     qreal y = kHeaderHeight;
     for (int i = 0; i < m_entity->columns.size(); ++i) {
@@ -110,37 +138,53 @@ void EntityItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option
         const QRectF rowRect(0, y, m_width, kRowHeight);
 
         if (selected) {
-            painter->fillRect(rowRect, palette.color(QPalette::Highlight).lighter(135));
+            QColor selectionTint = palette.color(QPalette::Highlight);
+            selectionTint.setAlpha(28);
+            painter->fillRect(rowRect, selectionTint);
         } else if (i % 2 == 1) {
             painter->fillRect(rowRect, palette.color(QPalette::AlternateBase));
         }
 
-        // Badge (PK / U).
-        const QRectF badgeRect(kHPadding, y, kBadgeWidth, kRowHeight);
-        painter->setPen(palette.color(QPalette::WindowText));
-        if (column.primaryKey)
-            painter->drawText(badgeRect, Qt::AlignLeft | Qt::AlignVCenter, QStringLiteral("PK"));
-        else if (column.unique)
-            painter->drawText(badgeRect, Qt::AlignLeft | Qt::AlignVCenter, QStringLiteral("U"));
+        const qreal chipWidth = kBadgeWidth;
+        if (column.primaryKey) {
+            // Filled accent chip.
+            const QRectF chipRect(kHPadding, y + (kRowHeight - 15.0) / 2.0, chipWidth, 15.0);
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(palette.color(QPalette::Highlight).lighter(118));
+            painter->drawRoundedRect(chipRect, 3.0, 3.0);
+            painter->setPen(palette.color(QPalette::WindowText));
+            painter->drawText(chipRect, Qt::AlignCenter, QStringLiteral("PK"));
+        } else if (column.unique) {
+            // Outlined chip.
+            const QRectF chipRect(kHPadding, y + (kRowHeight - 15.0) / 2.0, chipWidth, 15.0);
+            painter->setBrush(Qt::NoBrush);
+            painter->setPen(QPen(mutedColor, 1.0));
+            painter->drawRoundedRect(chipRect, 3.0, 3.0);
+            painter->setPen(mutedColor);
+            painter->drawText(chipRect, Qt::AlignCenter, QStringLiteral("U"));
+        }
 
         // Column name.
-        QRectF nameRect = badgeRect;
-        nameRect.setWidth(m_width - kHPadding * 2 - kBadgeWidth - 8.0);
-        painter->drawText(nameRect, Qt::AlignLeft | Qt::AlignVCenter, column.name);
+        const qreal nameX = kHPadding + chipWidth;
+        const qreal nameWidth = metrics.horizontalAdvance(column.name);
+        painter->setPen(palette.color(QPalette::WindowText));
+        painter->drawText(QRectF(nameX, y, nameWidth, kRowHeight), Qt::AlignLeft | Qt::AlignVCenter,
+                          column.name);
+
+        // Not-null marker, a small filled dot right after the name.
+        if (!column.nullable) {
+            const QPointF dotCenter(nameX + nameWidth + 6.0, y + kRowHeight / 2.0);
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(palette.color(QPalette::WindowText));
+            painter->drawEllipse(dotCenter, 2.2, 2.2);
+        }
 
         // Type, right-aligned, muted.
-        const QString typeText = columnTypeText(column.type);
-        const qreal typeWidth = metrics.horizontalAdvance(typeText) + 4.0;
-        QRectF typeRect(m_width - kHPadding - typeWidth, y, typeWidth, kRowHeight);
+        const QString typeText = column.type.displayName();
+        const qreal typeWidth = metrics.horizontalAdvance(typeText);
+        const QRectF typeRect(m_width - kHPadding - typeWidth, y, typeWidth, kRowHeight);
         painter->setPen(mutedColor);
         painter->drawText(typeRect, Qt::AlignRight | Qt::AlignVCenter, typeText);
-
-        // Not-null marker.
-        if (!column.nullable) {
-            painter->setPen(palette.color(QPalette::WindowText));
-            const QRectF nnRect(m_width - kHPadding - 3.0, y, 4.0, kRowHeight);
-            painter->drawText(nnRect, Qt::AlignRight | Qt::AlignVCenter, QStringLiteral("•"));
-        }
 
         y += kRowHeight;
     }

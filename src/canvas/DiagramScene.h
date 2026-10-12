@@ -69,7 +69,7 @@ private:
     Id m_diagramId;
     QHash<Id, EntityItem *> m_items;
     QHash<Id, RelationshipItem *> m_relationshipItems;
-    bool m_snapToGrid = true;
+    bool m_snapToGrid = false;   // Workbench-like free dragging by default
 
     bool m_linkMode = false;
     Id m_linkSourceEntity;

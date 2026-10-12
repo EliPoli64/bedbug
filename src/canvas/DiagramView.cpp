@@ -139,20 +139,20 @@ void DiagramView::drawBackground(QPainter *painter, const QRectF &rect)
     Q_UNUSED(rect);
 
     const qreal grid = DiagramScene::kGridSize;
+    const QRectF visible =
+        mapToScene(viewport()->rect()).boundingRect().adjusted(-grid, -grid, grid, grid);
 
-    // Compute the visible scene rect in item coordinates.
-    const QRectF visible = mapToScene(viewport()->rect()).boundingRect().adjusted(-grid, -grid, grid, grid);
-
-    QColor lineColor = palette().color(QPalette::Mid);
-    lineColor.setAlpha(70);
-    painter->setPen(QPen(lineColor, 0));
+    // Dotted grid — subtle, keeps focus on the diagram.
+    QColor dotColor = palette().color(QPalette::Mid);
+    dotColor.setAlpha(70);
+    painter->setPen(QPen(dotColor, 0));
+    painter->setBrush(dotColor);
 
     const qreal left = std::floor(visible.left() / grid) * grid;
     const qreal top = std::floor(visible.top() / grid) * grid;
     for (qreal x = left; x <= visible.right(); x += grid)
-        painter->drawLine(QPointF(x, visible.top()), QPointF(x, visible.bottom()));
-    for (qreal y = top; y <= visible.bottom(); y += grid)
-        painter->drawLine(QPointF(visible.left(), y), QPointF(visible.right(), y));
+        for (qreal y = top; y <= visible.bottom(); y += grid)
+            painter->drawEllipse(QPointF(x, y), 1.1, 1.1);
 }
 
 } // namespace bb

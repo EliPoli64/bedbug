@@ -220,6 +220,7 @@ private slots:
     void canonicalType_allKinds_compare();
     void canonicalType_kindConversion();
     void canonicalType_validation();
+    void canonicalType_displayName();
     void id_roundTrip();
     void domainHelpers();
 };
@@ -405,6 +406,27 @@ void ModelJsonTest::canonicalType_validation()
 
     CanonicalType uuid = ct(CanonicalType::Kind::Uuid);
     QVERIFY(uuid.isValid());
+}
+
+void ModelJsonTest::canonicalType_displayName()
+{
+    CanonicalType t = ct(CanonicalType::Kind::BigInt);
+    QCOMPARE(t.displayName(), QStringLiteral("bigint"));
+
+    t = ctVarchar(255);
+    QCOMPARE(t.displayName(), QStringLiteral("varchar(255)"));
+
+    t = ctDecimal(12, 3);
+    QCOMPARE(t.displayName(), QStringLiteral("decimal(12,3)"));
+
+    t = ctEnum({QStringLiteral("a"), QStringLiteral("b")});
+    QCOMPARE(t.displayName(), QStringLiteral("enum"));
+
+    t = ct(CanonicalType::Kind::Timestamp);
+    QCOMPARE(t.displayName(), QStringLiteral("timestamp"));
+
+    t = ctVarchar(0);   // no length -> bare kind
+    QCOMPARE(t.displayName(), QStringLiteral("varchar"));
 }
 
 void ModelJsonTest::id_roundTrip()

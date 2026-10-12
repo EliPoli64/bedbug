@@ -2,9 +2,13 @@
 
 #include "DiagramScene.h"
 #include "DocumentController.h"
+#include "EntityEditorPanel.h"
+#include "EntityItem.h"
 
 #include <QAction>
+#include <QActionGroup>
 #include <QApplication>
+#include <QDockWidget>
 #include <QMenu>
 #include <QMenuBar>
 #include <QShortcut>
@@ -13,6 +17,19 @@
 
 namespace bb {
 
+namespace {
+
+Id selectedEntityId(const DiagramScene *scene)
+{
+    for (QGraphicsItem *item : scene->selectedItems()) {
+        if (auto *entityItem = dynamic_cast<EntityItem *>(item))
+            return entityItem->entityId();
+    }
+    return Id();
+}
+
+} // namespace
+
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
     , m_document(new DocumentController(this))
@@ -20,19 +37,15 @@ MainWindow::MainWindow(QWidget *parent)
     , m_view(new DiagramView(m_scene, this))
 {
     setWindowTitle(QStringLiteral("bedbug"));
-    resize(1200, 800);
+    resize(1280, 820);
 
     setCentralWidget(m_view);
 
     m_scene->setModel(m_document->model());
     m_scene->setActiveDiagramId(m_document->activeDiagramId());
-    connect(m_document, &DocumentController::modelChanged, this, [this] {
-        m_scene->syncFromModel();
-        updateStatusMessage();
-    });
-    connect(m_scene, &DiagramScene::entityMoved, this, [this] {
-        updateStatusMessage();
-    });
+    connect(m_document, &DocumentController::modelChanged, this,
+            &MainWindow::syncScenePreservingSelection);
+    connect(m_scene, &DiagramScene::entityMoved, this, [this] { updateStatusMessage(); });
     connect(m_scene, &DiagramScene::linkStatusChanged, this, [this](const QString &text) {
         statusBar()->showMessage(text);
     });
@@ -43,8 +56,13 @@ MainWindow::MainWindow(QWidget *parent)
         m_document->addRelationship(childEntityId, childColumnIds, parentEntityId,
                                     parentColumnIds);
     });
+    connect(m_scene, &QGraphicsScene::selectionChanged, this, [this] {
+        statusBar()->showMessage(QString());
+        m_entityPanel->showEntity(selectedEntityId(m_scene));
+    });
 
     createActions();
+    createDock();
     createToolBars();
     createMenus();
 
@@ -63,7 +81,8 @@ void MainWindow::createActions()
     m_addTableAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
     m_addTableAction->setStatusTip(tr("Create a new table on the canvas"));
     connect(m_addTableAction, &QAction::triggered, this, [this] {
-        m_document->addEntity(QStringLiteral("table"));
+        Entity *entity = m_document->addEntity(QStringLiteral("table"));
+        m_pendingSelect = entity ? entity->id : Id();
     });
 
     m_linkAction = new QAction(tr("Link Mode"), this);
@@ -85,7 +104,7 @@ void MainWindow::createActions()
 
     m_snapAction = new QAction(tr("Snap to Grid"), this);
     m_snapAction->setCheckable(true);
-    m_snapAction->setChecked(true);
+    m_snapAction->setChecked(false);   // free dragging by default
     connect(m_snapAction, &QAction::toggled, m_scene, &DiagramScene::setSnapToGrid);
 }
 
@@ -121,13 +140,40 @@ void MainWindow::createMenus()
     viewMenu->addAction(m_fitAction);
     viewMenu->addSeparator();
     viewMenu->addAction(m_snapAction);
+    if (auto *dock = qobject_cast<QDockWidget *>(m_entityPanel->parentWidget()))
+        viewMenu->addAction(dock->toggleViewAction());
+}
+
+void MainWindow::createDock()
+{
+    auto *dock = new QDockWidget(tr("Entity Editor"), this);
+    dock->setObjectName(QStringLiteral("entityEditorDock"));
+    dock->setAllowedAreas(Qt::LeftDockWidgetArea | Qt::RightDockWidgetArea);
+
+    m_entityPanel = new EntityEditorPanel(dock);
+    m_entityPanel->setDocument(m_document);
+    dock->setWidget(m_entityPanel);
+
+    addDockWidget(Qt::RightDockWidgetArea, dock);
+}
+
+void MainWindow::syncScenePreservingSelection()
+{
+    const Id keep = !m_pendingSelect.isNull() ? m_pendingSelect : selectedEntityId(m_scene);
+    m_pendingSelect = Id();
+
+    m_scene->syncFromModel();
+    if (!keep.isNull()) {
+        if (EntityItem *item = m_scene->itemForEntity(keep))
+            item->setSelected(true);
+    }
+    updateStatusMessage();
 }
 
 void MainWindow::updateStatusMessage()
 {
-    const int entityCount = m_document->model()->entities.size();
     statusBar()->showMessage(tr("%1 table(s), %2 relationship(s)")
-                                 .arg(entityCount)
+                                 .arg(m_document->model()->entities.size())
                                  .arg(m_document->model()->relationships.size()));
 }
 

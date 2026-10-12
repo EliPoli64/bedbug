@@ -40,6 +40,18 @@ public:
     // Removes a column, any relationship referencing it, and any index referencing it.
     bool removeColumn(const Id &entityId, const Id &columnId);
 
+    // Renames an entity (empty names are ignored).
+    bool renameEntity(const Id &entityId, const QString &name);
+
+    // Appends a fully specified column to an entity and emits modelChanged().
+    Column *addColumn(const Id &entityId, const QString &name, const CanonicalType &type,
+                      bool nullable, bool primaryKey, bool unique, bool autoIncrement,
+                      const QString &defaultValue = {}, const QString &comment = {});
+
+    // Replaces an existing column's definition (its id is preserved) and emits
+    // modelChanged(). Returns false when the entity or column is unknown.
+    bool updateColumn(const Id &entityId, const Column &column);
+
 signals:
     void modelChanged();
 

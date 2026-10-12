@@ -163,4 +163,58 @@ bool DocumentController::removeColumn(const Id &entityId, const Id &columnId)
     return true;
 }
 
+bool DocumentController::renameEntity(const Id &entityId, const QString &name)
+{
+    if (name.trimmed().isEmpty())
+        return false;
+    Entity *entity = m_model.findEntity(entityId);
+    if (!entity)
+        return false;
+    entity->name = name;
+    emit modelChanged();
+    return true;
+}
+
+Column *DocumentController::addColumn(const Id &entityId, const QString &name,
+                                      const CanonicalType &type, bool nullable, bool primaryKey,
+                                      bool unique, bool autoIncrement, const QString &defaultValue,
+                                      const QString &comment)
+{
+    Entity *entity = m_model.findEntity(entityId);
+    if (!entity)
+        return nullptr;
+
+    Column column;
+    column.id = Id::create();
+    column.name = name;
+    column.type = type;
+    column.nullable = nullable;
+    column.primaryKey = primaryKey;
+    column.unique = unique;
+    column.autoIncrement = autoIncrement;
+    column.defaultValue = defaultValue;
+    column.comment = comment;
+
+    entity->columns.append(column);
+    emit modelChanged();
+    return &entity->columns.last();
+}
+
+bool DocumentController::updateColumn(const Id &entityId, const Column &column)
+{
+    Entity *entity = m_model.findEntity(entityId);
+    if (!entity)
+        return false;
+    for (Column &candidate : entity->columns) {
+        if (candidate.id == column.id) {
+            Column updated = column;
+            updated.id = column.id;   // ids are immutable
+            candidate = updated;
+            emit modelChanged();
+            return true;
+        }
+    }
+    return false;
+}
+
 } // namespace bb

@@ -74,4 +74,22 @@ bool CanonicalType::isValid() const
     }
 }
 
+QString CanonicalType::displayName() const
+{
+    switch (kind) {
+    case Kind::Varchar:
+    case Kind::Char: {
+        const QString base = kindToString(kind).toLower();
+        return length > 0 ? base + QStringLiteral("(%1)").arg(length) : base;
+    }
+    case Kind::Decimal:
+        return precision > 0 ? QStringLiteral("decimal(%1,%2)").arg(precision).arg(scale)
+                             : QStringLiteral("decimal");
+    case Kind::Enum:
+        return QStringLiteral("enum");
+    default:
+        return kindToString(kind).toLower();
+    }
+}
+
 } // namespace bb

@@ -36,6 +36,7 @@ private slots:
     void addRelationship_rejectsInvalidInput();
     void removeEntity_cascadesRelationshipsAndNodes();
     void removeColumn_removesRelationshipsAndIndexes();
+    void columnCrud_addUpdateRemove();
 };
 
 void DocumentControllerTest::addRelationship_linksTables()
@@ -160,6 +161,52 @@ void DocumentControllerTest::removeColumn_removesRelationshipsAndIndexes()
 
     // Unknown column.
     QVERIFY(!controller.removeColumn(childId, Id::create()));
+}
+
+void DocumentControllerTest::columnCrud_addUpdateRemove()
+{
+    DocumentController controller;
+    const Id entityId = controller.addEntity(QStringLiteral("customer"))->id;
+
+    CanonicalType bigint;
+    bigint.kind = CanonicalType::Kind::BigInt;
+    CanonicalType varchar;
+    varchar.kind = CanonicalType::Kind::Varchar;
+    varchar.length = 255;
+
+    Column *id = controller.addColumn(entityId, QStringLiteral("id"), bigint, false, true, false,
+                                      true);
+    QVERIFY(id);
+    QCOMPARE(controller.model()->findEntity(entityId)->columns.size(), 1);
+
+    Column *email =
+        controller.addColumn(entityId, QStringLiteral("email"), varchar, false, false, true, false);
+    QVERIFY(email);
+    QCOMPARE(controller.model()->findEntity(entityId)->columns.size(), 2);
+
+    // Update: change type + nullability; id must be preserved.
+    const Id emailId = email->id;
+    Column updated = *email;
+    updated.name = QStringLiteral("public_email");
+    updated.nullable = true;
+    QVERIFY(controller.updateColumn(entityId, updated));
+    const Column *reloaded = controller.model()->findEntity(entityId)->findColumn(emailId);
+    QVERIFY(reloaded);
+    QCOMPARE(reloaded->name, QStringLiteral("public_email"));
+    QVERIFY(reloaded->nullable);
+    QCOMPARE(reloaded->id, emailId);
+
+    // Rename the entity.
+    QVERIFY(controller.renameEntity(entityId, QStringLiteral("clients")));
+    QCOMPARE(controller.model()->findEntity(entityId)->name, QStringLiteral("clients"));
+    QVERIFY(!controller.renameEntity(entityId, QStringLiteral("   ")));
+
+    // Remove works and cascades the entity's columns.
+    QVERIFY(controller.removeColumn(entityId, emailId));
+    QCOMPARE(controller.model()->findEntity(entityId)->columns.size(), 1);
+
+    // Unknown entity.
+    QVERIFY(!controller.addColumn(Id::create(), QStringLiteral("x"), bigint, true, false, false, false));
 }
 
 QTEST_APPLESS_MAIN(DocumentControllerTest)

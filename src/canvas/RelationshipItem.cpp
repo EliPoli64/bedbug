@@ -157,7 +157,10 @@ void RelationshipItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *
     if (selected)
         color = option->palette.color(QPalette::Highlight);
 
-    painter->setPen(QPen(color, selected ? 2.0 : 1.2));
+    QPen pen(color, selected ? 2.2 : 1.4);
+    pen.setJoinStyle(Qt::RoundJoin);   // smooth rounded turns at route corners
+    pen.setCapStyle(Qt::RoundCap);
+    painter->setPen(pen);
     painter->setBrush(Qt::NoBrush);
     painter->drawPath(m_path);
 
