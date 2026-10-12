@@ -36,11 +36,15 @@ void paint(QPainter *painter, const QPointF &anchor, const QPointF &direction,
         painter->drawLine(QLineF(start, start + rotated(direction, 30.0) * kProngLength));
         painter->drawLine(QLineF(start, start + rotated(direction, -30.0) * kProngLength));
     } else {
-        // The "one" tick, a bar perpendicular to the edge.
-        const QPointF tickCenter = start + direction * kTickGap;
+        // The "one" side: a single perpendicular bar when optional, two parallel bars
+        // when mandatory ("one and only one").
+        const int tickCount = optional ? 1 : 2;
         const QPointF perpendicular(-direction.y(), direction.x());
-        painter->drawLine(QLineF(tickCenter - perpendicular * kTickHalfLength,
-                                 tickCenter + perpendicular * kTickHalfLength));
+        for (int i = 0; i < tickCount; ++i) {
+            const QPointF tickCenter = start + direction * (kTickGap + i * 3.0);
+            painter->drawLine(QLineF(tickCenter - perpendicular * kTickHalfLength,
+                                     tickCenter + perpendicular * kTickHalfLength));
+        }
     }
 }
 

@@ -7,8 +7,8 @@ namespace bb {
 
 enum class Cardinality
 {
-    One,   // perpendicular tick       ("one and only one")
-    Many,  // three diverging prongs   ("one or more")
+    One,   // perpendicular bar(s)      ("zero or one" / "one and only one")
+    Many,  // three diverging prongs    ("zero or more" / "one or more")
 };
 
 // Crow's-foot (IE) notation markers, painted at the end of a relationship edge,
@@ -24,7 +24,13 @@ inline constexpr qreal kTickHalfLength = 6.0;
 inline qreal markerZoneLength(Cardinality cardinality, bool optional)
 {
     qreal length = optional ? (2.0 * kCircleRadius + 2.0) : 0.0;
-    length += (cardinality == Cardinality::Many) ? kProngLength : kTickGap + 4.0;
+    if (cardinality == Cardinality::Many) {
+        length += kProngLength;
+    } else {
+        // Optional "one" has a single bar; mandatory "one and only one" has two, which
+        // extend one bar-width further.
+        length += kTickGap + (optional ? 4.0 : 3.0 + 4.0);
+    }
     return length;
 }
 
