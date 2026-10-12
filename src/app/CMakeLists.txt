@@ -6,5 +6,7 @@ qt_add_executable(bedbug
 
 target_link_libraries(bedbug PRIVATE
     Qt6::Widgets
+    bb_canvas
+    bb_document
     bb_core
 )

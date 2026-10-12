@@ -2,6 +2,8 @@
 
 #include <QApplication>
 
+using namespace bb;
+
 int main(int argc, char *argv[])
 {
     QApplication app(argc, argv);

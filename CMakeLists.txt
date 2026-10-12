@@ -13,5 +13,7 @@ enable_testing()
 
 add_subdirectory(src/core)
 add_subdirectory(src/sqlgen)
+add_subdirectory(src/document)
+add_subdirectory(src/canvas)
 add_subdirectory(src/app)
 add_subdirectory(tests)
