@@ -1,0 +1,33 @@
+{
+  "formatVersion": "1",
+  "model": { "name": "types", "preferredDialect": "postgres" },
+  "entities": [
+    {
+      "id": "bd000000-0000-0000-0000-000000000001",
+      "name": "types_demo",
+      "schema": "public",
+      "comment": "Every canonical type in one place.",
+      "columns": [
+        { "id": "bd000000-0000-0000-0000-000000000101", "name": "c_int", "type": { "kind": "Int" }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000102", "name": "c_bigint", "type": { "kind": "BigInt" }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000103", "name": "c_smallint", "type": { "kind": "SmallInt" }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000104", "name": "c_varchar", "type": { "kind": "Varchar", "length": 100 }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000105", "name": "c_char", "type": { "kind": "Char", "length": 2 }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000106", "name": "c_text", "type": { "kind": "Text" }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000107", "name": "c_bool", "type": { "kind": "Boolean" }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000108", "name": "c_date", "type": { "kind": "Date" }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000109", "name": "c_time", "type": { "kind": "Time" }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000110", "name": "c_ts", "type": { "kind": "Timestamp" }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000111", "name": "c_dec", "type": { "kind": "Decimal", "precision": 12, "scale": 3 }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000112", "name": "c_float", "type": { "kind": "Float" }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000113", "name": "c_double", "type": { "kind": "Double" }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000114", "name": "c_blob", "type": { "kind": "Blob" }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000115", "name": "c_json", "type": { "kind": "Json" }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000116", "name": "c_uuid", "type": { "kind": "Uuid" }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000117", "name": "c_enum", "type": { "kind": "Enum", "enumValues": ["red", "green", "blue"] }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false },
+        { "id": "bd000000-0000-0000-0000-000000000118", "name": "weird\"name", "type": { "kind": "Varchar", "length": 5 }, "nullable": true, "primaryKey": false, "unique": false, "autoIncrement": false }
+      ],
+      "indexes": []
+    }
+  ]
+}

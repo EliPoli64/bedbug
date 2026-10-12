@@ -1,0 +1,121 @@
+{
+  "formatVersion": "1",
+  "model": { "name": "composite_fk", "preferredDialect": "postgres" },
+  "entities": [
+    {
+      "id": "ee000000-0000-0000-0000-000000000001",
+      "name": "invoice",
+      "schema": "public",
+      "comment": "",
+      "columns": [
+        {
+          "id": "ee000000-0000-0000-0000-000000000101",
+          "name": "country",
+          "type": { "kind": "Char", "length": 2 },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "",
+          "comment": ""
+        },
+        {
+          "id": "ee000000-0000-0000-0000-000000000102",
+          "name": "number",
+          "type": { "kind": "Int" },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "",
+          "comment": ""
+        },
+        {
+          "id": "ee000000-0000-0000-0000-000000000103",
+          "name": "issued_on",
+          "type": { "kind": "Timestamp" },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "",
+          "comment": ""
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "id": "ee000000-0000-0000-0000-000000000002",
+      "name": "invoice_lines",
+      "schema": "public",
+      "comment": "",
+      "columns": [
+        {
+          "id": "ee000000-0000-0000-0000-000000000201",
+          "name": "invoice_country",
+          "type": { "kind": "Char", "length": 2 },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "",
+          "comment": ""
+        },
+        {
+          "id": "ee000000-0000-0000-0000-000000000202",
+          "name": "invoice_number",
+          "type": { "kind": "Int" },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "",
+          "comment": ""
+        },
+        {
+          "id": "ee000000-0000-0000-0000-000000000203",
+          "name": "sku",
+          "type": { "kind": "Varchar", "length": 32 },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "",
+          "comment": ""
+        },
+        {
+          "id": "ee000000-0000-0000-0000-000000000204",
+          "name": "qty",
+          "type": { "kind": "Int" },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "",
+          "comment": ""
+        }
+      ],
+      "indexes": [
+        {
+          "id": "ee000000-0000-0000-0000-000000000301",
+          "name": "ix_lines_sku",
+          "columnIds": ["ee000000-0000-0000-0000-000000000203"],
+          "unique": false
+        }
+      ]
+    }
+  ],
+  "relationships": [
+    {
+      "id": "ee000000-0000-0000-0000-000000000401",
+      "name": "fk_lines_invoice",
+      "childEntity": "ee000000-0000-0000-0000-000000000002",
+      "childColumns": ["ee000000-0000-0000-0000-000000000201", "ee000000-0000-0000-0000-000000000202"],
+      "parentEntity": "ee000000-0000-0000-0000-000000000001",
+      "parentColumns": ["ee000000-0000-0000-0000-000000000101", "ee000000-0000-0000-0000-000000000102"],
+      "identifying": false,
+      "onDelete": "",
+      "onUpdate": ""
+    }
+  ]
+}

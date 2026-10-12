@@ -1,0 +1,143 @@
+{
+  "formatVersion": "1",
+  "model": { "name": "simple", "preferredDialect": "postgres" },
+  "entities": [
+    {
+      "id": "cc000000-0000-0000-0000-000000000001",
+      "name": "customer",
+      "schema": "public",
+      "comment": "Customer master data.",
+      "columns": [
+        {
+          "id": "cc000000-0000-0000-0000-000000000101",
+          "name": "id",
+          "type": { "kind": "BigInt" },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "autoIncrement": true,
+          "defaultValue": "",
+          "comment": ""
+        },
+        {
+          "id": "cc000000-0000-0000-0000-000000000102",
+          "name": "name",
+          "type": { "kind": "Varchar", "length": 80 },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "",
+          "comment": ""
+        },
+        {
+          "id": "cc000000-0000-0000-0000-000000000103",
+          "name": "email",
+          "type": { "kind": "Varchar", "length": 255 },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": true,
+          "autoIncrement": false,
+          "defaultValue": "",
+          "comment": ""
+        },
+        {
+          "id": "cc000000-0000-0000-0000-000000000104",
+          "name": "status",
+          "type": { "kind": "Enum", "enumValues": ["active", "inactive"] },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "'active'",
+          "comment": ""
+        },
+        {
+          "id": "cc000000-0000-0000-0000-000000000105",
+          "name": "created_at",
+          "type": { "kind": "Timestamp" },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "CURRENT_TIMESTAMP",
+          "comment": "Row creation time."
+        }
+      ],
+      "indexes": [
+        {
+          "id": "cc000000-0000-0000-0000-000000000301",
+          "name": "ix_customer_created_at",
+          "columnIds": ["cc000000-0000-0000-0000-000000000105"],
+          "unique": false
+        }
+      ]
+    },
+    {
+      "id": "cc000000-0000-0000-0000-000000000002",
+      "name": "orders",
+      "schema": "public",
+      "comment": "",
+      "columns": [
+        {
+          "id": "cc000000-0000-0000-0000-000000000201",
+          "name": "id",
+          "type": { "kind": "BigInt" },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "autoIncrement": true,
+          "defaultValue": "",
+          "comment": ""
+        },
+        {
+          "id": "cc000000-0000-0000-0000-000000000202",
+          "name": "customer_id",
+          "type": { "kind": "BigInt" },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "",
+          "comment": ""
+        },
+        {
+          "id": "cc000000-0000-0000-0000-000000000203",
+          "name": "total",
+          "type": { "kind": "Decimal", "precision": 12, "scale": 2 },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "0",
+          "comment": ""
+        },
+        {
+          "id": "cc000000-0000-0000-0000-000000000204",
+          "name": "created_at",
+          "type": { "kind": "Timestamp" },
+          "nullable": false,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "CURRENT_TIMESTAMP",
+          "comment": ""
+        }
+      ],
+      "indexes": []
+    }
+  ],
+  "relationships": [
+    {
+      "id": "cc000000-0000-0000-0000-000000000401",
+      "name": "fk_orders_customer",
+      "childEntity": "cc000000-0000-0000-0000-000000000002",
+      "childColumns": ["cc000000-0000-0000-0000-000000000202"],
+      "parentEntity": "cc000000-0000-0000-0000-000000000001",
+      "parentColumns": ["cc000000-0000-0000-0000-000000000101"],
+      "identifying": false,
+      "onDelete": "CASCADE",
+      "onUpdate": "RESTRICT"
+    }
+  ]
+}

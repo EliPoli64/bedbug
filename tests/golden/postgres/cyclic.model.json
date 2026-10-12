@@ -1,0 +1,134 @@
+{
+  "formatVersion": "1",
+  "model": { "name": "cyclic", "preferredDialect": "postgres" },
+  "entities": [
+    {
+      "id": "ff000000-0000-0000-0000-000000000001",
+      "name": "a",
+      "schema": "public",
+      "comment": "",
+      "columns": [
+        {
+          "id": "ff000000-0000-0000-0000-000000000101",
+          "name": "id",
+          "type": { "kind": "BigInt" },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "autoIncrement": true,
+          "defaultValue": "",
+          "comment": ""
+        },
+        {
+          "id": "ff000000-0000-0000-0000-000000000102",
+          "name": "c_id",
+          "type": { "kind": "BigInt" },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "",
+          "comment": ""
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "id": "ff000000-0000-0000-0000-000000000002",
+      "name": "b",
+      "schema": "public",
+      "comment": "",
+      "columns": [
+        {
+          "id": "ff000000-0000-0000-0000-000000000201",
+          "name": "id",
+          "type": { "kind": "BigInt" },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "autoIncrement": true,
+          "defaultValue": "",
+          "comment": ""
+        },
+        {
+          "id": "ff000000-0000-0000-0000-000000000202",
+          "name": "a_id",
+          "type": { "kind": "BigInt" },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "",
+          "comment": ""
+        }
+      ],
+      "indexes": []
+    },
+    {
+      "id": "ff000000-0000-0000-0000-000000000003",
+      "name": "c",
+      "schema": "public",
+      "comment": "",
+      "columns": [
+        {
+          "id": "ff000000-0000-0000-0000-000000000301",
+          "name": "id",
+          "type": { "kind": "BigInt" },
+          "nullable": false,
+          "primaryKey": true,
+          "unique": false,
+          "autoIncrement": true,
+          "defaultValue": "",
+          "comment": ""
+        },
+        {
+          "id": "ff000000-0000-0000-0000-000000000302",
+          "name": "b_id",
+          "type": { "kind": "BigInt" },
+          "nullable": true,
+          "primaryKey": false,
+          "unique": false,
+          "autoIncrement": false,
+          "defaultValue": "",
+          "comment": ""
+        }
+      ],
+      "indexes": []
+    }
+  ],
+  "relationships": [
+    {
+      "id": "ff000000-0000-0000-0000-000000000401",
+      "name": "fk_a_c",
+      "childEntity": "ff000000-0000-0000-0000-000000000001",
+      "childColumns": ["ff000000-0000-0000-0000-000000000102"],
+      "parentEntity": "ff000000-0000-0000-0000-000000000003",
+      "parentColumns": ["ff000000-0000-0000-0000-000000000301"],
+      "identifying": false,
+      "onDelete": "",
+      "onUpdate": ""
+    },
+    {
+      "id": "ff000000-0000-0000-0000-000000000402",
+      "name": "fk_b_a",
+      "childEntity": "ff000000-0000-0000-0000-000000000002",
+      "childColumns": ["ff000000-0000-0000-0000-000000000202"],
+      "parentEntity": "ff000000-0000-0000-0000-000000000001",
+      "parentColumns": ["ff000000-0000-0000-0000-000000000101"],
+      "identifying": false,
+      "onDelete": "",
+      "onUpdate": ""
+    },
+    {
+      "id": "ff000000-0000-0000-0000-000000000403",
+      "name": "fk_c_b",
+      "childEntity": "ff000000-0000-0000-0000-000000000003",
+      "childColumns": ["ff000000-0000-0000-0000-000000000302"],
+      "parentEntity": "ff000000-0000-0000-0000-000000000002",
+      "parentColumns": ["ff000000-0000-0000-0000-000000000201"],
+      "identifying": false,
+      "onDelete": "",
+      "onUpdate": ""
+    }
+  ]
+}

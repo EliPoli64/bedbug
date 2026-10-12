@@ -12,5 +12,6 @@ qt_standard_project_setup(REQUIRES 6.8)
 enable_testing()
 
 add_subdirectory(src/core)
+add_subdirectory(src/sqlgen)
 add_subdirectory(src/app)
 add_subdirectory(tests)
