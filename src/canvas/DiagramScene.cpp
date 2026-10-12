@@ -2,6 +2,7 @@
 
 #include "RelationshipItem.h"
 
+#include <QGraphicsSceneContextMenuEvent>
 #include <QGraphicsSceneMouseEvent>
 
 #include <utility>
@@ -144,6 +145,32 @@ bool DiagramScene::handleLinkAt(const QPointF &scenePos)
     const Column &column = entityItem->entity()->columns.at(row);
     beginOrCompleteLink(entityItem->entityId(), column.id);
     return true;
+}
+
+bool DiagramScene::handleTableContextMenu(const QPointF &scenePos, const QPoint &globalPos)
+{
+    EntityItem *entityItem = nullptr;
+    const QList<QGraphicsItem *> hits = items(scenePos);
+    for (QGraphicsItem *item : hits) {
+        if (auto *entity = dynamic_cast<EntityItem *>(item)) {
+            entityItem = entity;
+            break;
+        }
+    }
+    if (!entityItem)
+        return false;
+
+    emit tableContextMenuRequested(entityItem->entityId(), globalPos);
+    return true;
+}
+
+void DiagramScene::contextMenuEvent(QGraphicsSceneContextMenuEvent *event)
+{
+    if (handleTableContextMenu(event->scenePos(), event->screenPos())) {
+        event->accept();
+        return;
+    }
+    QGraphicsScene::contextMenuEvent(event);
 }
 
 void DiagramScene::mousePressEvent(QGraphicsSceneMouseEvent *event)

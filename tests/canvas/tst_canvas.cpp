@@ -117,6 +117,7 @@ private slots:
     void relationshipItem_rendersAndRefreshesOnMove();
     void relationshipItem_skipped_whenEntityNotOnDiagram();
     void linkMode_clicksCreateRelationship();
+    void contextMenu_onTableEmitsRequest();
     void crowsfoot_markersRenderDistinctly();
 };
 
@@ -391,6 +392,42 @@ void CanvasTest::linkMode_clicksCreateRelationship()
     QCOMPARE(childColumns, QList<Id>{fk->id});
     QCOMPARE(parentId, customer.id);
     QCOMPARE(parentColumns, QList<Id>{pk->id});
+
+    delete model;
+}
+
+void CanvasTest::contextMenu_onTableEmitsRequest()
+{
+    Model *model = new Model(twoEntitySceneModel());
+    DiagramScene scene;
+    scene.setModel(model);
+    scene.setActiveDiagramId(model->diagrams.first().id);
+    scene.syncFromModel();
+
+    const Id entityId = model->entities.constFirst().id;
+    EntityItem *item = scene.itemForEntity(entityId);
+    QVERIFY(item);
+
+    bool emitted = false;
+    Id requestedId;
+    QPoint requestedPos;
+    connect(&scene, &DiagramScene::tableContextMenuRequested, this,
+            [&](const Id &id, const QPoint &pos) {
+                emitted = true;
+                requestedId = id;
+                requestedPos = pos;
+            });
+
+    const QPointF scenePoint = item->mapToScene(item->boundingRect().center());
+    QVERIFY(scene.handleTableContextMenu(scenePoint, QPoint(42, 43)));
+    QVERIFY(emitted);
+    QCOMPARE(requestedId, entityId);
+    QCOMPARE(requestedPos, QPoint(42, 43));
+
+    // Empty space: not handled, no signal.
+    emitted = false;
+    QVERIFY(!scene.handleTableContextMenu(QPointF(9000, 9000), QPoint()));
+    QVERIFY(!emitted);
 
     delete model;
 }

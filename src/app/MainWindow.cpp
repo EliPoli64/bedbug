@@ -1,5 +1,6 @@
 #include "MainWindow.h"
 
+#include "ColumnEditorDialog.h"
 #include "DiagramScene.h"
 #include "DocumentController.h"
 #include "EntityEditorPanel.h"
@@ -9,8 +10,10 @@
 #include <QActionGroup>
 #include <QApplication>
 #include <QDockWidget>
+#include <QInputDialog>
 #include <QMenu>
 #include <QMenuBar>
+#include <QMessageBox>
 #include <QShortcut>
 #include <QStatusBar>
 #include <QToolBar>
@@ -60,6 +63,8 @@ MainWindow::MainWindow(QWidget *parent)
         statusBar()->showMessage(QString());
         m_entityPanel->showEntity(selectedEntityId(m_scene));
     });
+    connect(m_scene, &DiagramScene::tableContextMenuRequested, this,
+            &MainWindow::showTableContextMenu);
 
     createActions();
     createDock();
@@ -175,6 +180,93 @@ void MainWindow::updateStatusMessage()
     statusBar()->showMessage(tr("%1 table(s), %2 relationship(s)")
                                  .arg(m_document->model()->entities.size())
                                  .arg(m_document->model()->relationships.size()));
+}
+
+void MainWindow::focusEntity(const Id &entityId)
+{
+    if (entityId.isNull())
+        return;
+    if (EntityItem *item = m_scene->itemForEntity(entityId))
+        item->setSelected(true);
+    m_entityPanel->showEntity(entityId);
+}
+
+void MainWindow::addColumnToEntity(const Id &entityId)
+{
+    Entity *entity = m_document->model()->findEntity(entityId);
+    if (!entity)
+        return;
+
+    // The table stays focused while the dialog is open so the panel follows.
+    focusEntity(entityId);
+
+    QStringList existingNames;
+    for (const Column &column : entity->columns)
+        existingNames.append(column.name);
+
+    ColumnEditorDialog dialog(this);
+    dialog.setExistingNames(existingNames);
+    if (dialog.exec() != QDialog::Accepted)
+        return;
+
+    const Column built = dialog.column();
+    if (built.name.isEmpty())
+        return;
+
+    m_document->addColumn(entityId, built.name, built.type, built.nullable, built.primaryKey,
+                          built.unique, built.autoIncrement, built.defaultValue, built.comment);
+}
+
+void MainWindow::removeTable(const Id &entityId)
+{
+    const Entity *entity = m_document->model()->findEntity(entityId);
+    if (!entity)
+        return;
+
+    const int relationshipCount =
+        m_document->model()->relationshipsFor(entityId).size();
+    const QString question =
+        relationshipCount > 0
+            ? tr("Remove table '%1' and its %n relationship(s)?", nullptr, relationshipCount)
+                  .arg(entity->name)
+            : tr("Remove table '%1'?").arg(entity->name);
+
+    if (QMessageBox::question(this, tr("Remove Table"), question) == QMessageBox::Yes)
+        m_document->removeEntity(entityId);
+}
+
+void MainWindow::showTableContextMenu(const Id &entityId, const QPoint &globalPos)
+{
+    const Entity *entity = m_document->model()->findEntity(entityId);
+    if (!entity)
+        return;
+
+    QMenu menu(this);
+    menu.addSection(entity->name.isEmpty() ? tr("Table") : entity->name);
+
+    QAction *addColumn = menu.addAction(tr("Add Column…"));
+    QAction *editColumns = menu.addAction(tr("Edit Columns"));
+    QAction *rename = menu.addAction(tr("Rename…"));
+    QAction *link = menu.addAction(tr("Link Relationship"));
+    menu.addSeparator();
+    QAction *remove = menu.addAction(tr("Remove Table…"));
+
+    QAction *chosen = menu.exec(globalPos);
+    if (chosen == addColumn) {
+        addColumnToEntity(entityId);
+    } else if (chosen == rename) {
+        const QString name = QInputDialog::getText(this, tr("Rename Table"), tr("Table name:"),
+                                                   QLineEdit::Normal, entity->name);
+        if (!name.trimmed().isEmpty() && name != entity->name)
+            m_document->renameEntity(entityId, name);
+    } else if (chosen == link) {
+        focusEntity(entityId);
+        m_linkAction->setChecked(true);
+    } else if (chosen == editColumns) {
+        focusEntity(entityId);
+    } else if (chosen == remove) {
+        removeTable(entityId);
+    }
 }
 
 } // namespace bb

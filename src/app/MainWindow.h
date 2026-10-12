@@ -26,6 +26,11 @@ private:
     void syncScenePreservingSelection();
     void updateStatusMessage();
 
+    void focusEntity(const Id &entityId);
+    void addColumnToEntity(const Id &entityId);
+    void removeTable(const Id &entityId);
+    void showTableContextMenu(const Id &entityId, const QPoint &globalPos);
+
     DocumentController *m_document = nullptr;
     DiagramScene *m_scene = nullptr;
     DiagramView *m_view = nullptr;

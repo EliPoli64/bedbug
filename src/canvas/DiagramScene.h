@@ -53,12 +53,18 @@ public:
     // Processes one link-mode click at a scene position. Returns true when handled.
     bool handleLinkAt(const QPointF &scenePos);
 
+    // Processes a context-menu request at a scene position. Returns true when it landed
+    // on a table (emitting tableContextMenuRequested).
+    bool handleTableContextMenu(const QPointF &scenePos, const QPoint &globalPos);
+
 signals:
     void entityMoved(const Id &entityId, const QPointF &pos);
     void linkStatusChanged(const QString &text);
+    void tableContextMenuRequested(const Id &entityId, const QPoint &globalPos);
 
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
+    void contextMenuEvent(QGraphicsSceneContextMenuEvent *event) override;
 
 private:
     Diagram *findDiagram();
