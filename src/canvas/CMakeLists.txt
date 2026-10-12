@@ -1,10 +1,14 @@
 qt_add_library(bb_canvas STATIC
+    CrowsFootPainter.cpp
+    CrowsFootPainter.h
     DiagramScene.cpp
     DiagramScene.h
     DiagramView.cpp
     DiagramView.h
     EntityItem.cpp
     EntityItem.h
+    RelationshipItem.cpp
+    RelationshipItem.h
 )
 
 target_include_directories(bb_canvas PUBLIC

@@ -1,6 +1,8 @@
+#include "CrowsFootPainter.h"
 #include "DiagramScene.h"
 #include "DocumentController.h"
 #include "EntityItem.h"
+#include "RelationshipItem.h"
 
 #include <QImage>
 #include <QPainter>
@@ -67,6 +69,37 @@ Model twoEntitySceneModel()
     return model;
 }
 
+const Column *columnByName(const Entity &entity, const QString &name)
+{
+    for (const Column &column : entity.columns) {
+        if (column.name == name)
+            return &column;
+    }
+    return nullptr;
+}
+
+// TwoEntitySceneModel with one FK: orders.customer_id -> customer.id.
+Model twoEntityConnectedModel()
+{
+    Model model = twoEntitySceneModel();
+    const Entity &customer = model.entities.at(0);
+    const Entity &orders = model.entities.at(1);
+
+    const Column *pk = columnByName(customer, QStringLiteral("id"));
+    const Column *fk = columnByName(orders, QStringLiteral("customer_id"));
+    Q_ASSERT(pk && fk);
+
+    Relationship relationship;
+    relationship.id = Id::create();
+    relationship.name = QStringLiteral("fk_orders_customer");
+    relationship.childEntity = orders.id;
+    relationship.childColumns = {fk->id};
+    relationship.parentEntity = customer.id;
+    relationship.parentColumns = {pk->id};
+    model.relationships = {relationship};
+    return model;
+}
+
 } // namespace
 
 class CanvasTest : public QObject
@@ -81,6 +114,10 @@ private slots:
     void ports_areOnRowCenters();
     void addEntityViaController_updatesScene();
     void paint_rendersEntityWithoutError();
+    void relationshipItem_rendersAndRefreshesOnMove();
+    void relationshipItem_skipped_whenEntityNotOnDiagram();
+    void linkMode_clicksCreateRelationship();
+    void crowsfoot_markersRenderDistinctly();
 };
 
 void CanvasTest::syncFromModel_createsItems()
@@ -245,6 +282,146 @@ void CanvasTest::paint_rendersEntityWithoutError()
     QVERIFY(painted);
 
     delete model;
+}
+
+void CanvasTest::relationshipItem_rendersAndRefreshesOnMove()
+{
+    Model *model = new Model(twoEntityConnectedModel());
+    DiagramScene scene;
+    scene.setModel(model);
+    scene.setActiveDiagramId(model->diagrams.first().id);
+    scene.setSnapToGrid(false);
+    scene.syncFromModel();
+
+    const Id relationshipId = model->relationships.first().id;
+    RelationshipItem *item = scene.itemForRelationship(relationshipId);
+    QVERIFY(item);
+    QVERIFY(item->isVisible());
+
+    const QRectF before = item->boundingRect();
+    QVERIFY(before.width() > 0);
+
+    // Move the child across to the other side; the edge must re-route.
+    const Id ordersId = model->entities.at(1).id;
+    scene.itemForEntity(ordersId)->setPos(QPointF(700, 320));
+    const QRectF after = item->boundingRect();
+    QVERIFY(after != before);
+
+    delete model;
+}
+
+void CanvasTest::relationshipItem_skipped_whenEntityNotOnDiagram()
+{
+    Model model = twoEntitySceneModel();
+
+    // A third entity that has a relationship but sits on no diagram.
+    Entity orphan;
+    orphan.id = Id::create();
+    orphan.name = QStringLiteral("orphan");
+    const Id customerColumnId = columnByName(model.entities.constFirst(), QStringLiteral("id"))->id;
+    Column orphanId;
+    orphanId.id = Id::create();
+    orphanId.name = QStringLiteral("id");
+    orphan.columns = {orphanId};
+
+    Relationship stray;
+    stray.id = Id::create();
+    stray.name = QStringLiteral("fk_customer_orphan");
+    stray.childEntity = model.entities.constFirst().id;
+    stray.childColumns = {customerColumnId};
+    stray.parentEntity = orphan.id;
+    stray.parentColumns = {orphanId.id};
+    model.relationships = {stray};
+
+    DiagramScene scene;
+    scene.setModel(&model);
+    scene.setActiveDiagramId(model.diagrams.first().id);
+    scene.syncFromModel();
+
+    // The edge references an entity that has no item: no relationship item is created.
+    QCOMPARE(scene.itemForRelationship(stray.id), nullptr);
+}
+
+void CanvasTest::linkMode_clicksCreateRelationship()
+{
+    Model *model = new Model(twoEntitySceneModel());
+    DiagramScene scene;
+    scene.setModel(model);
+    scene.setActiveDiagramId(model->diagrams.first().id);
+    scene.setSnapToGrid(false);
+    scene.syncFromModel();
+
+    bool called = false;
+    Id childId, parentId;
+    QList<Id> childColumns, parentColumns;
+    scene.setRelationshipCreationHandler(
+        [&](const Id &child, const QList<Id> &childCols, const Id &parent,
+            const QList<Id> &parentCols) {
+            called = true;
+            childId = child;
+            childColumns = childCols;
+            parentId = parent;
+            parentColumns = parentCols;
+        });
+
+    scene.setLinkMode(true);
+    QVERIFY(scene.linkMode());
+
+    const Entity &customer = model->entities.at(0);
+    const Entity &orders = model->entities.at(1);
+    const Column *pk = columnByName(customer, QStringLiteral("id"));
+    const Column *fk = columnByName(orders, QStringLiteral("customer_id"));
+
+    EntityItem *ordersItem = scene.itemForEntity(orders.id);
+    EntityItem *customerItem = scene.itemForEntity(customer.id);
+
+    // Click the inside of the FK row (orders.customer_id, second row).
+    const qreal childRowY = EntityItem::kHeaderHeight + 1 * EntityItem::kRowHeight
+                            + EntityItem::kRowHeight / 2.0;
+    const QPointF childClick = ordersItem->mapToScene(QPointF(10, childRowY));
+    QVERIFY(scene.handleLinkAt(childClick));
+    QVERIFY(!called);
+
+    // Click the inside of the PK row (customer.id, first row).
+    const qreal parentRowY = EntityItem::kHeaderHeight + EntityItem::kRowHeight / 2.0;
+    const QPointF parentClick = customerItem->mapToScene(QPointF(10, parentRowY));
+    QVERIFY(scene.handleLinkAt(parentClick));
+    QVERIFY(called);
+    QCOMPARE(childId, orders.id);
+    QCOMPARE(childColumns, QList<Id>{fk->id});
+    QCOMPARE(parentId, customer.id);
+    QCOMPARE(parentColumns, QList<Id>{pk->id});
+
+    delete model;
+}
+
+void CanvasTest::crowsfoot_markersRenderDistinctly()
+{
+    auto render = [](Cardinality cardinality, bool optional) {
+        QImage image(96, 64, QImage::Format_ARGB32_Premultiplied);
+        image.fill(Qt::white);
+        QPainter painter(&image);
+        painter.setPen(QPen(Qt::black, 1));
+        CrowsFootPainter::paint(&painter, QPointF(20, 32), QPointF(1, 0), cardinality, optional);
+        painter.end();
+        return image;
+    };
+    auto inkCount = [](const QImage &image) {
+        int ink = 0;
+        for (int y = 0; y < image.height(); ++y)
+            for (int x = 0; x < image.width(); ++x)
+                if (qAlpha(image.pixel(x, y)) > 0 && qGray(image.pixel(x, y)) < 200)
+                    ++ink;
+        return ink;
+    };
+
+    const QImage many = render(Cardinality::Many, false);
+    const QImage one = render(Cardinality::One, false);
+    const QImage manyOptional = render(Cardinality::Many, true);
+
+    QVERIFY(inkCount(many) > 0);
+    QVERIFY(inkCount(many) != inkCount(one));
+    QVERIFY(inkCount(manyOptional) > inkCount(many));
 }
 
 QTEST_MAIN(CanvasTest)

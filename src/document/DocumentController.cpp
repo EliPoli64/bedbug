@@ -2,6 +2,22 @@
 
 namespace bb {
 
+namespace {
+
+bool columnsBelongTo(const Model &model, const Id &entityId, const QList<Id> &columnIds)
+{
+    const Entity *entity = model.findEntity(entityId);
+    if (!entity)
+        return false;
+    for (const Id &columnId : columnIds) {
+        if (!entity->findColumn(columnId))
+            return false;
+    }
+    return true;
+}
+
+} // namespace
+
 DocumentController::DocumentController(QObject *parent)
     : QObject(parent)
 {
@@ -49,6 +65,102 @@ Entity *DocumentController::addEntity(const QString &name)
 
     emit modelChanged();
     return &m_model.entities.last();
+}
+
+Relationship *DocumentController::addRelationship(const Id &childEntityId,
+                                                  const QList<Id> &childColumnIds,
+                                                  const Id &parentEntityId,
+                                                  const QList<Id> &parentColumnIds,
+                                                  const QString &name)
+{
+    if (childEntityId == parentEntityId)
+        return nullptr;
+    if (childColumnIds.isEmpty() || parentColumnIds.isEmpty())
+        return nullptr;
+    if (!columnsBelongTo(m_model, childEntityId, childColumnIds))
+        return nullptr;
+    if (!columnsBelongTo(m_model, parentEntityId, parentColumnIds))
+        return nullptr;
+
+    Relationship relationship;
+    relationship.id = Id::create();
+    relationship.childEntity = childEntityId;
+    relationship.childColumns = childColumnIds;
+    relationship.parentEntity = parentEntityId;
+    relationship.parentColumns = parentColumnIds;
+
+    if (name.isEmpty()) {
+        const Entity *child = m_model.findEntity(childEntityId);
+        const Entity *parent = m_model.findEntity(parentEntityId);
+        relationship.name = QStringLiteral("fk_%1_%2")
+                                .arg(child ? child->name : QStringLiteral("child"),
+                                     parent ? parent->name : QStringLiteral("parent"));
+    } else {
+        relationship.name = name;
+    }
+
+    m_model.relationships.append(relationship);
+    emit modelChanged();
+    return &m_model.relationships.last();
+}
+
+bool DocumentController::removeEntity(const Id &entityId)
+{
+    int index = -1;
+    for (int i = 0; i < m_model.entities.size(); ++i) {
+        if (m_model.entities.at(i).id == entityId) {
+            index = i;
+            break;
+        }
+    }
+    if (index < 0)
+        return false;
+
+    // Drop every relationship that touches this entity.
+    m_model.relationships.removeIf([entityId](const Relationship &relationship) {
+        return relationship.childEntity == entityId || relationship.parentEntity == entityId;
+    });
+
+    // Drop every diagram node that references this entity.
+    for (Diagram &diagram : m_model.diagrams) {
+        diagram.nodes.removeIf(
+            [entityId](const DiagramNode &node) { return node.entity == entityId; });
+    }
+
+    m_model.entities.removeAt(index);
+    emit modelChanged();
+    return true;
+}
+
+bool DocumentController::removeColumn(const Id &entityId, const Id &columnId)
+{
+    Entity *entity = m_model.findEntity(entityId);
+    if (!entity)
+        return false;
+
+    int index = -1;
+    for (int i = 0; i < entity->columns.size(); ++i) {
+        if (entity->columns.at(i).id == columnId) {
+            index = i;
+            break;
+        }
+    }
+    if (index < 0)
+        return false;
+
+    // Drop relationships that reference the removed column.
+    m_model.relationships.removeIf([columnId](const Relationship &relationship) {
+        return relationship.childColumns.contains(columnId)
+               || relationship.parentColumns.contains(columnId);
+    });
+
+    // Drop indexes that referenced the column.
+    entity->indexes.removeIf(
+        [columnId](const Index &index) { return index.columnIds.contains(columnId); });
+
+    entity->columns.removeAt(index);
+    emit modelChanged();
+    return true;
 }
 
 } // namespace bb

@@ -27,6 +27,19 @@ public:
     // modelChanged().
     Entity *addEntity(const QString &name);
 
+    // Creates a foreign-key relationship between columns of two distinct entities and
+    // emits modelChanged(). Returns nullptr when either entity or any column is unknown,
+    // or when both sides live on the same entity.
+    Relationship *addRelationship(const Id &childEntityId, const QList<Id> &childColumnIds,
+                                  const Id &parentEntityId, const QList<Id> &parentColumnIds,
+                                  const QString &name = {});
+
+    // Removes an entity, all its diagram nodes, and every relationship touching it.
+    bool removeEntity(const Id &entityId);
+
+    // Removes a column, any relationship referencing it, and any index referencing it.
+    bool removeColumn(const Id &entityId, const Id &columnId);
+
 signals:
     void modelChanged();
 

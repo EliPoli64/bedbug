@@ -26,6 +26,7 @@ private:
     DiagramScene *m_scene = nullptr;
     DiagramView *m_view = nullptr;
     QAction *m_addTableAction = nullptr;
+    QAction *m_linkAction = nullptr;
     QAction *m_zoomInAction = nullptr;
     QAction *m_zoomOutAction = nullptr;
     QAction *m_fitAction = nullptr;

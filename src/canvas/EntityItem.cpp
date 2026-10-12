@@ -2,6 +2,7 @@
 
 #include "DiagramScene.h"
 
+#include <QApplication>
 #include <QFontMetricsF>
 #include <QGraphicsScene>
 #include <QPainter>
@@ -43,7 +44,9 @@ EntityItem::EntityItem(const Entity *entity, QGraphicsItem *parent)
 {
     setAcceptedMouseButtons(Qt::LeftButton);
     if (m_entity) {
-        QFontMetricsF metrics{QFont()};
+        // Measure with the application font, which is what QGraphicsView paints with by
+        // default. (M3 used the library font, causing rows to overflow the box width.)
+        QFontMetricsF metrics{QApplication::font()};
         m_width = 180.0;
         m_width = qMax(m_width, metrics.horizontalAdvance(m_entity->name) + kHPadding * 2);
         for (const Column &column : m_entity->columns) {
