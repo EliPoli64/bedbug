@@ -2,9 +2,13 @@
 #include "DocumentController.h"
 #include "EntityEditorPanel.h"
 
+#include <QAbstractButton>
+#include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
 #include <QLineEdit>
+#include <QListWidget>
+#include <QMessageBox>
 #include <QPushButton>
 #include <QTimer>
 #include <QtTest>
@@ -29,6 +33,7 @@ class EntityEditorTest : public QObject
 private slots:
     void panelReflectsModelChanges();
     void addColumnViaButton_showsInList();
+    void removeColumnViaButton_removesSelected();
     void primaryKeySelectsAutoIncrementAndUnique();
     void enumRowTogglesWithKind();
     void dialogRejectsDuplicateNames();
@@ -87,6 +92,57 @@ void EntityEditorTest::addColumnViaButton_showsInList()
 
     QCOMPARE(panel.columnCount(), 1);
     QVERIFY(!panel.columnIdAt(0).isNull());
+
+    panel.close();
+}
+
+void EntityEditorTest::removeColumnViaButton_removesSelected()
+{
+    DocumentController controller;
+    EntityEditorPanel panel;
+    panel.setDocument(&controller);
+    panel.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&panel));
+
+    const Id entityId = controller.addEntity(QStringLiteral("customer"))->id;
+    controller.addColumn(entityId, QStringLiteral("id"), bigintType(), false, true, false, true);
+    controller.addColumn(entityId, QStringLiteral("email"), bigintType(), false, false, true, false);
+    panel.showEntity(entityId);
+    QCOMPARE(panel.columnCount(), 2);
+
+    auto *list = panel.findChild<QListWidget *>(QStringLiteral("columnList"));
+    QVERIFY(list);
+    list->setCurrentRow(0);
+
+    auto answerBox = [](QMessageBox::StandardButton answer) {
+        QTimer::singleShot(0, [answer] {
+            const QList<QWidget *> topLevels = QApplication::topLevelWidgets();
+            for (QWidget *widget : topLevels) {
+                if (auto *box = qobject_cast<QMessageBox *>(widget)) {
+                    for (QAbstractButton *button : box->buttons()) {
+                        if (box->standardButton(button) == answer) {
+                            button->click();
+                            return;
+                        }
+                    }
+                }
+            }
+        });
+    };
+
+    // Confirm removal with Yes: the armed column goes away.
+    answerBox(QMessageBox::Yes);
+    auto *removeButton = panel.findChild<QPushButton *>(QStringLiteral("removeButton"));
+    QVERIFY(removeButton);
+    QTest::mouseClick(removeButton, Qt::LeftButton);
+    QCOMPARE(panel.columnCount(), 1);
+
+    // Cancel with No: nothing is removed even though a column stays armed.
+    const int before = controller.model()->findEntity(entityId)->columns.size();
+    answerBox(QMessageBox::No);
+    QTest::mouseClick(removeButton, Qt::LeftButton);
+    QCOMPARE(controller.model()->findEntity(entityId)->columns.size(), before);
+    QCOMPARE(panel.columnCount(), before);
 
     panel.close();
 }

@@ -24,6 +24,7 @@ EntityEditorPanel::EntityEditorPanel(QWidget *parent)
     connect(m_nameEdit, &QLineEdit::editingFinished, this, &EntityEditorPanel::onNameEdited);
 
     m_columnList = new QListWidget(this);
+    m_columnList->setObjectName(QStringLiteral("columnList"));
     m_columnList->setAlternatingRowColors(true);
     connect(m_columnList, &QListWidget::itemDoubleClicked, this,
             [this] { editColumn(); });
@@ -101,8 +102,13 @@ void EntityEditorPanel::refreshName()
 
 void EntityEditorPanel::refreshList()
 {
+    // Remember the armed column before rebuilding.
+    Id previous;
+    if (const QListWidgetItem *item = m_columnList->currentItem())
+        previous = columnIdAt(m_columnList->row(item));
+
     m_columnList->clear();
-    const Entity *entity = m_controller->model()->findEntity(m_entityId);
+    const Entity *entity = m_controller ? m_controller->model()->findEntity(m_entityId) : nullptr;
     if (!entity)
         return;
 
@@ -125,6 +131,20 @@ void EntityEditorPanel::refreshList()
         item->setData(Qt::UserRole, column.id.toString());
         m_columnList->addItem(item);
     }
+
+    // Re-arm the previously selected column, else the first one, so that Edit/Remove
+    // always have a target even right after a model refresh wiped the selection.
+    int row = -1;
+    for (int i = 0; i < m_columnList->count(); ++i) {
+        if (columnIdAt(i) == previous) {
+            row = i;
+            break;
+        }
+    }
+    if (row < 0 && m_columnList->count() > 0)
+        row = 0;
+    if (row >= 0)
+        m_columnList->setCurrentRow(row);
 }
 
 int EntityEditorPanel::columnCount() const
@@ -170,8 +190,18 @@ void EntityEditorPanel::addColumn()
     if (built.name.isEmpty())
         return;
 
-    m_controller->addColumn(m_entityId, built.name, built.type, built.nullable, built.primaryKey,
-                            built.unique, built.autoIncrement, built.defaultValue, built.comment);
+    Column *added = m_controller->addColumn(m_entityId, built.name, built.type, built.nullable,
+                                            built.primaryKey, built.unique, built.autoIncrement,
+                                            built.defaultValue, built.comment);
+    if (added) {
+        // Arm the newly added column in the list.
+        for (int i = 0; i < m_columnList->count(); ++i) {
+            if (columnIdAt(i) == added->id) {
+                m_columnList->setCurrentRow(i);
+                break;
+            }
+        }
+    }
 }
 
 void EntityEditorPanel::editColumn()
