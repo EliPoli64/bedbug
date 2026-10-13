@@ -373,4 +373,77 @@ Entity *DocumentController::createManyToMany(const Id &leftEntityId, const Id &r
     return &m_model.entities.last();
 }
 
+Relationship *DocumentController::addRelationshipPick(RelationshipKind kind,
+                                                      const Id &childEntityId,
+                                                      const Id &childColumnId,
+                                                      const Id &parentEntityId,
+                                                      const Id &parentColumnId,
+                                                      const QString &name)
+{
+    if (kind == RelationshipKind::ManyToMany)
+        return nullptr;
+    Entity *child = m_model.findEntity(childEntityId);
+    Entity *parent = m_model.findEntity(parentEntityId);
+    if (!child || !parent || childEntityId == parentEntityId)
+        return nullptr;
+
+    // Parent (referenced) column: explicit > primary key > first column.
+    const Column *parentColumn = nullptr;
+    if (!parentColumnId.isNull())
+        parentColumn = parent->findColumn(parentColumnId);
+    if (!parentColumn)
+        parentColumn = primaryColumnOrFirst(*parent);
+    if (!parentColumn)
+        return nullptr;
+
+    // Child (FK) column: explicit > an existing "{parent}_id" > a freshly created one.
+    Id childFkId = childColumnId;
+    if (childFkId.isNull()) {
+        const QString candidate = sanitizeTableName(parent->name) + QStringLiteral("_id");
+        for (const Column &column : child->columns) {
+            if (column.name.compare(candidate, Qt::CaseInsensitive) == 0) {
+                childFkId = column.id;
+                break;
+            }
+        }
+    }
+    if (childFkId.isNull()) {
+        Column column;
+        column.id = Id::create();
+        column.name = sanitizeTableName(parent->name) + QStringLiteral("_id");
+        column.type = parentColumn->type;
+        column.nullable = (kind != RelationshipKind::OneToOne);
+        column.primaryKey = false;
+        if (kind == RelationshipKind::OneToOne)
+            column.unique = true;
+        child->columns.append(column);
+        childFkId = column.id;
+    }
+    if (!child->findColumn(childFkId))
+        return nullptr;
+
+    Relationship relationship;
+    relationship.id = Id::create();
+    relationship.childEntity = childEntityId;
+    relationship.childColumns = {childFkId};
+    relationship.parentEntity = parentEntityId;
+    relationship.parentColumns = {parentColumn->id};
+    relationship.identifying = (kind == RelationshipKind::OneToOne);
+    relationship.name = name.isEmpty() ? QStringLiteral("fk_%1_%2")
+                                                .arg(child->name, parent->name)
+                                       : name;
+
+    // 1:1 relationships are enforced by a unique constraint on the child FK column(s).
+    if (kind == RelationshipKind::OneToOne) {
+        for (const Id &columnId : relationship.childColumns) {
+            if (Column *column = child->findColumn(columnId))
+                column->unique = true;
+        }
+    }
+
+    m_model.relationships.append(relationship);
+    emit modelChanged();
+    return &m_model.relationships.last();
+}
+
 } // namespace bb

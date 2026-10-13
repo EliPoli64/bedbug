@@ -153,12 +153,15 @@ void EntityEditorTest::primaryKeySelectsAutoIncrementAndUnique()
     auto *pk = dialog.findChild<QCheckBox *>(QStringLiteral("primaryKeyCheck"));
     auto *ai = dialog.findChild<QCheckBox *>(QStringLiteral("autoIncrementCheck"));
     auto *unique = dialog.findChild<QCheckBox *>(QStringLiteral("uniqueCheck"));
-    QVERIFY(pk && ai && unique);
+    auto *nullable = dialog.findChild<QCheckBox *>(QStringLiteral("nullableCheck"));
+    QVERIFY(pk && ai && unique && nullable);
 
     QVERIFY(!ai->isChecked());
+    QVERIFY(nullable->isChecked());   // default for a new column
     pk->setChecked(true);
     QVERIFY(ai->isChecked());
     QVERIFY(unique->isChecked());
+    QVERIFY(!nullable->isChecked());   // PK implies not-null
 }
 
 void EntityEditorTest::enumRowTogglesWithKind()

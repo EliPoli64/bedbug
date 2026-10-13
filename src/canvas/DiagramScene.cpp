@@ -97,7 +97,7 @@ void DiagramScene::setLinkTool(std::optional<RelationshipKind> tool)
 }
 
 void DiagramScene::setRelationshipCreationHandler(
-    std::function<void(const Id &, const QList<Id> &, const Id &, const QList<Id> &,
+    std::function<bool(const Id &, const QList<Id> &, const Id &, const QList<Id> &,
                        RelationshipKind)>
         handler)
 {
@@ -115,8 +115,9 @@ void DiagramScene::beginOrCompleteLink(const Id &entityId, const Id &columnId)
         QString label;
         if (m_model) {
             if (const Entity *entity = m_model->findEntity(entityId))
-                if (const Column *column = entity->findColumn(columnId))
-                    label = QStringLiteral("%1.%2").arg(entity->name, column->name);
+                if (!columnId.isNull())
+                    if (const Column *column = entity->findColumn(columnId))
+                        label = QStringLiteral("%1.%2").arg(entity->name, column->name);
         }
         emit linkStatusChanged(
             tr("Source %1 — now click a target column on another table").arg(label));
@@ -124,10 +125,10 @@ void DiagramScene::beginOrCompleteLink(const Id &entityId, const Id &columnId)
     }
 
     if (m_linkSourceEntity == entityId) {
-        // Same table: restart the source at this column instead.
+        // Same table: restart the source at this point instead.
         m_linkSourceEntity = entityId;
         m_linkSourceColumn = columnId;
-        emit linkStatusChanged(tr("Restarted source on this column"));
+        emit linkStatusChanged(tr("Restarted source on this table"));
         return;
     }
 
@@ -137,8 +138,13 @@ void DiagramScene::beginOrCompleteLink(const Id &entityId, const Id &columnId)
     m_linkSourceColumn = Id();
 
     if (m_relationshipHandler) {
-        m_relationshipHandler(childEntity, {childColumn}, entityId, {columnId}, *m_linkTool);
-        emit linkStatusChanged(tr("Relationship created"));
+        const QList<Id> childColumns =
+            childColumn.isNull() ? QList<Id>() : QList<Id>{childColumn};
+        const QList<Id> parentColumns = columnId.isNull() ? QList<Id>() : QList<Id>{columnId};
+        const bool created =
+            m_relationshipHandler(childEntity, childColumns, entityId, parentColumns, *m_linkTool);
+        emit linkStatusChanged(created ? tr("Relationship created")
+                                       : tr("Could not create relationship"));
     }
 }
 
@@ -164,8 +170,11 @@ bool DiagramScene::handleLinkAt(const QPointF &scenePos)
     }
 
     const int row = entityItem->columnAt(entityItem->mapFromScene(scenePos));
-    if (row < 0)
+    if (row < 0) {
+        // Tapping the table (header/body) auto-resolves the column on completion.
+        beginOrCompleteLink(entityItem->entityId(), Id());
         return true;
+    }
 
     const Column &column = entityItem->entity()->columns.at(row);
     beginOrCompleteLink(entityItem->entityId(), column.id);

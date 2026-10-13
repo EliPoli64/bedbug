@@ -117,11 +117,12 @@ ColumnEditorDialog::ColumnEditorDialog(QWidget *parent)
     connect(m_kind, &QComboBox::currentIndexChanged, this,
             [this] { updateParameterEdits(); });
 
-    // Selecting "Primary key" implies auto-increment and unique.
+    // Selecting "Primary key" implies auto-increment, unique, and not-null.
     connect(m_primaryKey, &QCheckBox::toggled, this, [this](bool checked) {
         if (checked) {
             m_autoIncrement->setChecked(true);
             m_unique->setChecked(true);
+            m_nullable->setChecked(false);
         }
     });
 

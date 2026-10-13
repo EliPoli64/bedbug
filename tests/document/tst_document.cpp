@@ -40,6 +40,8 @@ private slots:
     void duplicateColumnNamesRejected();
     void createManyToMany_buildsJunction();
     void addRelationshipOneToOne_marksChildUnique();
+    void addRelationshipPick_autoCreatesColumn();
+    void addRelationshipPick_reusesExistingColumn();
 };
 
 void DocumentControllerTest::addRelationship_linksTables()
@@ -295,6 +297,53 @@ void DocumentControllerTest::addRelationshipOneToOne_marksChildUnique()
     QVERIFY(relationship);
     QVERIFY(relationship->identifying);
     QVERIFY(child->columns.first().unique);
+}
+
+void DocumentControllerTest::addRelationshipPick_autoCreatesColumn()
+{
+    DocumentController controller;
+    const Id parentId = controller.addEntity(QStringLiteral("customer"))->id;
+    const Id childId = controller.addEntity(QStringLiteral("orders"))->id;
+
+    Entity *parent = byId(controller.model(), parentId);
+    Entity *child = byId(controller.model(), childId);
+    Column parentPk = makeColumn("11000000-0000-0000-0000-000000000001", "id");
+    parentPk.primaryKey = true;
+    parent->columns.append(parentPk);
+    QVERIFY(child->columns.isEmpty());
+
+    // No explicit columns: the child FK "customer_id" is created automatically.
+    Relationship *relationship =
+        controller.addRelationshipPick(RelationshipKind::OneToMany, childId, Id(), parentId, Id());
+    QVERIFY(relationship);
+    QCOMPARE(child->columns.size(), 1);
+    const Column &created = child->columns.first();
+    QCOMPARE(created.name, QStringLiteral("customer_id"));
+    QVERIFY(created.nullable);
+    QVERIFY(created.type == parentPk.type);
+    QCOMPARE(relationship->parentColumns, QList<Id>{parentPk.id});
+    QCOMPARE(controller.model()->relationships.size(), 1);
+}
+
+void DocumentControllerTest::addRelationshipPick_reusesExistingColumn()
+{
+    DocumentController controller;
+    const Id parentId = controller.addEntity(QStringLiteral("customer"))->id;
+    const Id childId = controller.addEntity(QStringLiteral("orders"))->id;
+
+    Entity *parent = byId(controller.model(), parentId);
+    Entity *child = byId(controller.model(), childId);
+    Column parentPk = makeColumn("12000000-0000-0000-0000-000000000001", "id");
+    parentPk.primaryKey = true;
+    Column existingFk = makeColumn("12000000-0000-0000-0000-000000000002", "customer_id");
+    parent->columns.append(parentPk);
+    child->columns.append(existingFk);
+
+    // A column named "customer_id" already exists: it is reused, not duplicated.
+    QVERIFY(controller.addRelationshipPick(RelationshipKind::OneToMany, childId, Id(), parentId,
+                                           Id()));
+    QCOMPARE(child->columns.size(), 1);
+    QCOMPARE(controller.model()->relationships.size(), 1);
 }
 
 QTEST_APPLESS_MAIN(DocumentControllerTest)

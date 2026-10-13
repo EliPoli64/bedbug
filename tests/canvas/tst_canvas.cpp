@@ -118,6 +118,7 @@ private slots:
     void relationshipItem_skipped_whenEntityNotOnDiagram();
     void linkMode_clicksCreateRelationship();
     void linkTool_oneToOneFlowsThrough();
+    void tableClicks_resolveColumnsViaHandler();
     void relationshipItem_cardinalityDerivedFromUniqueness();
     void contextMenu_onTableEmitsRequest();
     void crowsfoot_markersRenderDistinctly();
@@ -360,13 +361,14 @@ void CanvasTest::linkMode_clicksCreateRelationship()
     QList<Id> childColumns, parentColumns;
     scene.setRelationshipCreationHandler(
         [&](const Id &child, const QList<Id> &childCols, const Id &parent,
-            const QList<Id> &parentCols, RelationshipKind kind) {
+            const QList<Id> &parentCols, RelationshipKind kind) -> bool {
             called = true;
             childId = child;
             childColumns = childCols;
             parentId = parent;
             parentColumns = parentCols;
             createdKind = kind;
+            return true;
         });
 
     scene.setLinkTool(std::make_optional(RelationshipKind::OneToMany));
@@ -412,8 +414,10 @@ void CanvasTest::linkTool_oneToOneFlowsThrough()
 
     RelationshipKind createdKind = RelationshipKind::OneToMany;
     scene.setRelationshipCreationHandler(
-        [&](const Id &, const QList<Id> &, const Id &, const QList<Id> &, RelationshipKind kind) {
+        [&](const Id &, const QList<Id> &, const Id &, const QList<Id> &,
+            RelationshipKind kind) -> bool {
             createdKind = kind;
+            return true;
         });
 
     scene.setLinkTool(std::make_optional(RelationshipKind::OneToOne));
@@ -431,6 +435,49 @@ void CanvasTest::linkTool_oneToOneFlowsThrough()
 
     scene.setLinkTool(std::nullopt);
     QVERIFY(!scene.linkTool().has_value());
+
+    delete model;
+}
+
+void CanvasTest::tableClicks_resolveColumnsViaHandler()
+{
+    Model *model = new Model(twoEntitySceneModel());
+    DiagramScene scene;
+    scene.setModel(model);
+    scene.setActiveDiagramId(model->diagrams.first().id);
+    scene.syncFromModel();
+
+    bool called = false;
+    QList<Id> childColumns, parentColumns;
+    scene.setRelationshipCreationHandler(
+        [&](const Id &, const QList<Id> &childCols, const Id &, const QList<Id> &parentCols,
+            RelationshipKind) -> bool {
+            called = true;
+            childColumns = childCols;
+            parentColumns = parentCols;
+            return true;
+        });
+
+    scene.setLinkTool(std::make_optional(RelationshipKind::OneToMany));
+
+    const Entity &customer = model->entities.at(0);
+    const Entity &orders = model->entities.at(1);
+    EntityItem *ordersItem = scene.itemForEntity(orders.id);
+    EntityItem *customerItem = scene.itemForEntity(customer.id);
+
+    // Click the child's HEADER and the parent's HEADER: no specific columns — the handler
+    // receives empty lists so the shell resolves/creates columns automatically.
+    const QPointF childHeader(
+        ordersItem->mapToScene(QPointF(20, EntityItem::kHeaderHeight / 2.0)));
+    scene.handleLinkAt(childHeader);
+    QVERIFY(!called);
+
+    const QPointF parentHeader(
+        customerItem->mapToScene(QPointF(20, EntityItem::kHeaderHeight / 2.0)));
+    scene.handleLinkAt(parentHeader);
+    QVERIFY(called);
+    QVERIFY(childColumns.isEmpty());
+    QVERIFY(parentColumns.isEmpty());
 
     delete model;
 }

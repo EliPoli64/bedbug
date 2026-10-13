@@ -44,6 +44,15 @@ public:
     // nullptr when either table is missing or has no referenceable columns.
     Entity *createManyToMany(const Id &leftEntityId, const Id &rightEntityId);
 
+    // Resolves the columns for a 1:1 / 1:N relationship and creates it:
+    //  - parent column: the explicit column, else the parent's primary key (or first).
+    //  - child column: the explicit column, else a column named "{parent}_id" — reused if
+    //    present, otherwise created with the parent column's type.
+    // Returns nullptr on failure (the request is dropped) and emits modelChanged() once.
+    Relationship *addRelationshipPick(RelationshipKind kind, const Id &childEntityId,
+                                      const Id &childColumnId, const Id &parentEntityId,
+                                      const Id &parentColumnId, const QString &name = {});
+
     // Removes an entity, all its diagram nodes, and every relationship touching it.
     bool removeEntity(const Id &entityId);
 

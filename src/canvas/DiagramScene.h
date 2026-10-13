@@ -52,8 +52,9 @@ public:
     void setPointedLines(bool enabled) { m_pointedLines = enabled; }
 
     // Called by the shell whenever a relationship should be created from link mode.
+    // Returns true when the relationship was actually created (drives the status text).
     void setRelationshipCreationHandler(
-        std::function<void(const Id &childEntityId, const QList<Id> &childColumnIds,
+        std::function<bool(const Id &childEntityId, const QList<Id> &childColumnIds,
                            const Id &parentEntityId, const QList<Id> &parentColumnIds,
                            RelationshipKind kind)>
             handler);
@@ -89,7 +90,7 @@ private:
     bool m_pointedLines = false;
     Id m_linkSourceEntity;
     Id m_linkSourceColumn;
-    std::function<void(const Id &, const QList<Id> &, const Id &, const QList<Id> &,
+    std::function<bool(const Id &, const QList<Id> &, const Id &, const QList<Id> &,
                        RelationshipKind)>
         m_relationshipHandler;
 };

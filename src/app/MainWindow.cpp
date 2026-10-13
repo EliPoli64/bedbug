@@ -58,13 +58,17 @@ MainWindow::MainWindow(QWidget *parent)
     m_scene->setRelationshipCreationHandler(
         [this](const Id &childEntityId, const QList<Id> &childColumnIds,
                const Id &parentEntityId, const QList<Id> &parentColumnIds,
-               RelationshipKind kind) {
-            if (kind == RelationshipKind::ManyToMany) {
-                m_document->createManyToMany(childEntityId, parentEntityId);
-            } else {
-                m_document->addRelationship(kind, childEntityId, childColumnIds, parentEntityId,
-                                            parentColumnIds);
-            }
+               RelationshipKind kind) -> bool {
+            if (kind == RelationshipKind::ManyToMany)
+                return m_document->createManyToMany(childEntityId, parentEntityId) != nullptr;
+
+            const Id childColumn =
+                childColumnIds.isEmpty() ? Id() : childColumnIds.first();
+            const Id parentColumn =
+                parentColumnIds.isEmpty() ? Id() : parentColumnIds.first();
+            return m_document->addRelationshipPick(kind, childEntityId, childColumn, parentEntityId,
+                                                   parentColumn)
+                   != nullptr;
         });
     connect(m_scene, &QGraphicsScene::selectionChanged, this, [this] {
         statusBar()->showMessage(QString());
