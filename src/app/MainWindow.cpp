@@ -127,9 +127,26 @@ void MainWindow::createActions()
     m_addTableAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
     m_addTableAction->setStatusTip(tr("Create a new table on the canvas"));
     connect(m_addTableAction, &QAction::triggered, this, [this] {
+        // Suggest the next free "tableN" name.
+        int counter = 1;
+        QString suggested;
+        const auto &entities = m_document->model()->entities;
+        do {
+            suggested = QStringLiteral("table%1").arg(counter++);
+            bool taken = false;
+            for (const Entity &entity : entities) {
+                if (entity.name.compare(suggested, Qt::CaseInsensitive) == 0) {
+                    taken = true;
+                    break;
+                }
+            }
+            if (!taken)
+                break;
+        } while (true);
+
         bool ok = false;
         const QString name = QInputDialog::getText(this, tr("Add Table"), tr("Table name:"),
-                                                   QLineEdit::Normal, QStringLiteral("table"), &ok);
+                                                   QLineEdit::Normal, suggested, &ok);
         if (!ok || name.trimmed().isEmpty())
             return;
         const QString trimmed = name.trimmed();
