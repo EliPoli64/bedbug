@@ -31,11 +31,30 @@ private:
     void removeTable(const Id &entityId);
     void showTableContextMenu(const Id &entityId, const QPoint &globalPos);
 
+    // File actions.
+    void openDocument();
+    void saveDocument();
+    void saveDocumentAs();
+    void updateWindowTitle();
+
+    // Session autosave: the board is persisted on close and restored on startup so the
+    // app comes back to where you left off, even without an explicit save.
+    QString sessionFilePath() const;
+    void restoreSession();
+    void saveSession();
+
+protected:
+    void closeEvent(QCloseEvent *event) override;
+
     DocumentController *m_document = nullptr;
     DiagramScene *m_scene = nullptr;
     DiagramView *m_view = nullptr;
     EntityEditorPanel *m_entityPanel = nullptr;
     QAction *m_addTableAction = nullptr;
+    QAction *m_newAction = nullptr;
+    QAction *m_openAction = nullptr;
+    QAction *m_saveAction = nullptr;
+    QAction *m_saveAsAction = nullptr;
     QAction *m_oneToOneAction = nullptr;
     QAction *m_oneToManyAction = nullptr;
     QAction *m_manyToManyAction = nullptr;

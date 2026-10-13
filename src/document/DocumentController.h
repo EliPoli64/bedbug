@@ -23,6 +23,27 @@ public:
     const Diagram *activeDiagram() const;
     Id activeDiagramId() const { return m_activeDiagramId; }
 
+    // --- File lifecycle -------------------------------------------------------
+
+    // Loads a document from disk, adopting it as the current file. Returns false with
+    // a populated errorMessage on failure.
+    bool loadFromFile(const QString &path, QString *errorMessage = nullptr);
+
+    // Writes the document and adopts it as the current file (clears the dirty flag).
+    bool saveToFile(const QString &path, QString *errorMessage = nullptr);
+
+    // Session autosave: reads/writes the current model without changing the document
+    // file path or dirty flag (used for restore-on-startup).
+    bool loadSession(const QString &path, QString *errorMessage = nullptr);
+    bool saveSession(const QString &path, QString *errorMessage = nullptr) const;
+
+    // Resets to a fresh document with one empty diagram.
+    void newDocument();
+
+    bool isModified() const { return m_modified; }
+    bool hasFile() const { return !m_filePath.isEmpty(); }
+    QString filePath() const { return m_filePath; }
+
     // Creates an entity plus a diagram node, positioned in a cascading grid, and emits
     // modelChanged().
     Entity *addEntity(const QString &name);
@@ -75,8 +96,12 @@ signals:
     void modelChanged();
 
 private:
+    void markModifiedAndNotify();
+
     Id m_activeDiagramId;
     Model m_model;
+    QString m_filePath;
+    bool m_modified = false;
 };
 
 } // namespace bb

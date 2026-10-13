@@ -9,13 +9,18 @@
 #include <QAction>
 #include <QActionGroup>
 #include <QApplication>
+#include <QCloseEvent>
+#include <QDir>
 #include <QDockWidget>
+#include <QFileDialog>
+#include <QFileInfo>
 #include <QInputDialog>
 #include <QLineEdit>
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QShortcut>
+#include <QStandardPaths>
 #include <QStatusBar>
 #include <QToolBar>
 
@@ -70,6 +75,9 @@ MainWindow::MainWindow(QWidget *parent)
                                                    parentColumn)
                    != nullptr;
         });
+    connect(m_document, &DocumentController::modelChanged, this, [this] {
+        updateWindowTitle();
+    });
     connect(m_scene, &QGraphicsScene::selectionChanged, this, [this] {
         statusBar()->showMessage(QString());
         m_entityPanel->showEntity(selectedEntityId(m_scene));
@@ -81,6 +89,10 @@ MainWindow::MainWindow(QWidget *parent)
     createDock();
     createToolBars();
     createMenus();
+
+    // Come back to the previous board, even when nothing was ever saved.
+    restoreSession();
+    updateWindowTitle();
 
     auto *escShortcut = new QShortcut(QKeySequence(Qt::Key_Escape), this);
     connect(escShortcut, &QShortcut::activated, this, [this] {
@@ -95,6 +107,22 @@ MainWindow::MainWindow(QWidget *parent)
 
 void MainWindow::createActions()
 {
+    m_newAction = new QAction(tr("&New"), this);
+    m_newAction->setShortcut(QKeySequence::New);
+    connect(m_newAction, &QAction::triggered, m_document, &DocumentController::newDocument);
+
+    m_openAction = new QAction(tr("&Open…"), this);
+    m_openAction->setShortcut(QKeySequence::Open);
+    connect(m_openAction, &QAction::triggered, this, &MainWindow::openDocument);
+
+    m_saveAction = new QAction(tr("&Save"), this);
+    m_saveAction->setShortcut(QKeySequence::Save);
+    connect(m_saveAction, &QAction::triggered, this, &MainWindow::saveDocument);
+
+    m_saveAsAction = new QAction(tr("Save &As…"), this);
+    m_saveAsAction->setShortcut(QKeySequence::SaveAs);
+    connect(m_saveAsAction, &QAction::triggered, this, &MainWindow::saveDocumentAs);
+
     m_addTableAction = new QAction(tr("Add Table"), this);
     m_addTableAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
     m_addTableAction->setStatusTip(tr("Create a new table on the canvas"));
@@ -185,7 +213,11 @@ void MainWindow::createToolBars()
 void MainWindow::createMenus()
 {
     QMenu *fileMenu = menuBar()->addMenu(tr("&File"));
-    fileMenu->addAction(tr("&New"), QKeySequence::New, this, &MainWindow::close);
+    fileMenu->addAction(m_newAction);
+    fileMenu->addAction(m_openAction);
+    fileMenu->addSeparator();
+    fileMenu->addAction(m_saveAction);
+    fileMenu->addAction(m_saveAsAction);
     fileMenu->addSeparator();
     fileMenu->addAction(tr("E&xit"), QKeySequence::Quit, this, &MainWindow::close);
 
@@ -329,6 +361,90 @@ void MainWindow::showTableContextMenu(const Id &entityId, const QPoint &globalPo
     } else if (chosen == remove) {
         removeTable(entityId);
     }
+}
+
+void MainWindow::openDocument()
+{
+    const QString path = QFileDialog::getOpenFileName(
+        this, tr("Open Document"), QString(),
+        tr("bedbug documents (*.json);;All files (*)"));
+    if (path.isEmpty())
+        return;
+
+    QString error;
+    if (!m_document->loadFromFile(path, &error))
+        QMessageBox::warning(this, tr("Open Document"),
+                             tr("Could not open '%1':\n%2").arg(path, error));
+}
+
+void MainWindow::saveDocument()
+{
+    if (!m_document->hasFile()) {
+        saveDocumentAs();
+        return;
+    }
+    QString error;
+    if (!m_document->saveToFile(m_document->filePath(), &error))
+        QMessageBox::warning(this, tr("Save Document"),
+                             tr("Could not save '%1':\n%2").arg(m_document->filePath(), error));
+}
+
+void MainWindow::saveDocumentAs()
+{
+    const QString suggested = m_document->model()->name.isEmpty()
+                                  ? QStringLiteral("untitled.json")
+                                  : m_document->model()->name + QStringLiteral(".json");
+    const QString path = QFileDialog::getSaveFileName(this, tr("Save Document As"), suggested,
+                                                      tr("bedbug documents (*.json)"));
+    if (path.isEmpty())
+        return;
+
+    QString error;
+    if (!m_document->saveToFile(path, &error))
+        QMessageBox::warning(this, tr("Save Document"), tr("Could not save:\n%1").arg(error));
+}
+
+void MainWindow::updateWindowTitle()
+{
+    QString documentName;
+    if (m_document->hasFile())
+        documentName = QFileInfo(m_document->filePath()).completeBaseName();
+    else
+        documentName = m_document->model()->name;
+
+    setWindowTitle(tr("bedbug — %1[*]")
+                       .arg(documentName.isEmpty() ? tr("Untitled") : documentName));
+    setWindowModified(m_document->isModified());
+}
+
+QString MainWindow::sessionFilePath() const
+{
+    const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
+    QDir().mkpath(directory);
+    return directory + QStringLiteral("/session.bedbug.json");
+}
+
+void MainWindow::restoreSession()
+{
+    const QString path = sessionFilePath();
+    if (!QFileInfo::exists(path))
+        return;
+    QString error;
+    if (!m_document->loadSession(path, &error))
+        qWarning() << "Could not restore session:" << error;
+}
+
+void MainWindow::saveSession()
+{
+    QString error;
+    if (!m_document->saveSession(sessionFilePath(), &error))
+        qWarning() << "Could not save session:" << error;
+}
+
+void MainWindow::closeEvent(QCloseEvent *event)
+{
+    saveSession();
+    QMainWindow::closeEvent(event);
 }
 
 } // namespace bb

@@ -1,8 +1,66 @@
 #include "DocumentController.h"
 
+#include "JsonSerializer.h"
+
+#include <QFile>
+#include <QJsonDocument>
+
 namespace bb {
 
 namespace {
+
+bool loadJsonDocument(const QString &path, Model *model, QString *errorMessage)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::ReadOnly)) {
+        if (errorMessage)
+            *errorMessage = file.errorString();
+        return false;
+    }
+    const QJsonDocument doc = QJsonDocument::fromJson(file.readAll());
+    if (doc.isNull() || !doc.isObject()) {
+        if (errorMessage)
+            *errorMessage = QStringLiteral("File does not contain a valid bedbug document");
+        return false;
+    }
+    QString error;
+    *model = JsonSerializer::fromJson(doc.object(), &error);
+    if (!error.isEmpty()) {
+        if (errorMessage)
+            *errorMessage = error;
+        return false;
+    }
+    return true;
+}
+
+bool writeModelTo(const Model &model, const QString &path, QString *errorMessage)
+{
+    QFile file(path);
+    if (!file.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+        if (errorMessage)
+            *errorMessage = file.errorString();
+        return false;
+    }
+    file.write(JsonSerializer::toBytes(model, true));
+    file.close();
+    if (file.error() != QFileDevice::NoError) {
+        if (errorMessage)
+            *errorMessage = QStringLiteral("Write failed: %1").arg(file.errorString());
+        return false;
+    }
+    return true;
+}
+
+void ensureDiagram(Model *model, Id *activeDiagramId)
+{
+    if (model->diagrams.isEmpty()) {
+        Diagram diagram;
+        diagram.id = Id::create();
+        diagram.name = QStringLiteral("Main");
+        model->diagrams.append(diagram);
+    }
+    *activeDiagramId = model->diagrams.first().id;
+}
 
 bool columnsBelongTo(const Model &model, const Id &entityId, const QList<Id> &columnIds)
 {
@@ -97,7 +155,7 @@ Entity *DocumentController::addEntity(const QString &name)
         diagram->nodes.append(node);
     }
 
-    emit modelChanged();
+    markModifiedAndNotify();
     return &m_model.entities.last();
 }
 
@@ -157,7 +215,7 @@ Relationship *DocumentController::addRelationship(RelationshipKind kind, const I
     }
 
     m_model.relationships.append(relationship);
-    emit modelChanged();
+    markModifiedAndNotify();
     return &m_model.relationships.last();
 }
 
@@ -185,7 +243,7 @@ bool DocumentController::removeEntity(const Id &entityId)
     }
 
     m_model.entities.removeAt(index);
-    emit modelChanged();
+    markModifiedAndNotify();
     return true;
 }
 
@@ -216,7 +274,7 @@ bool DocumentController::removeColumn(const Id &entityId, const Id &columnId)
         [columnId](const Index &index) { return index.columnIds.contains(columnId); });
 
     entity->columns.removeAt(index);
-    emit modelChanged();
+    markModifiedAndNotify();
     return true;
 }
 
@@ -238,7 +296,7 @@ bool DocumentController::renameEntity(const Id &entityId, const QString &name)
     }
 
     entity->name = trimmed;
-    emit modelChanged();
+    markModifiedAndNotify();
     return true;
 }
 
@@ -274,7 +332,7 @@ Column *DocumentController::addColumn(const Id &entityId, const QString &name,
     column.comment = comment;
 
     entity->columns.append(column);
-    emit modelChanged();
+    markModifiedAndNotify();
     return &entity->columns.last();
 }
 
@@ -302,7 +360,7 @@ bool DocumentController::updateColumn(const Id &entityId, const Column &column)
             updated.name = trimmed;
             updated.id = column.id;   // ids are immutable
             candidate = updated;
-            emit modelChanged();
+            markModifiedAndNotify();
             return true;
         }
     }
@@ -389,7 +447,7 @@ Entity *DocumentController::createManyToMany(const Id &leftEntityId, const Id &r
         diagram->nodes.append(node);
     }
 
-    emit modelChanged();
+    markModifiedAndNotify();
     return &m_model.entities.last();
 }
 
@@ -462,8 +520,74 @@ Relationship *DocumentController::addRelationshipPick(RelationshipKind kind,
     }
 
     m_model.relationships.append(relationship);
-    emit modelChanged();
+    markModifiedAndNotify();
     return &m_model.relationships.last();
+}
+
+// --- File lifecycle -------------------------------------------------------
+
+void DocumentController::markModifiedAndNotify()
+{
+    m_modified = true;
+    emit modelChanged();
+}
+
+bool DocumentController::loadFromFile(const QString &path, QString *errorMessage)
+{
+    Model loaded;
+    if (!loadJsonDocument(path, &loaded, errorMessage))
+        return false;
+
+    Id activeId;
+    ensureDiagram(&loaded, &activeId);
+    m_model = loaded;
+    m_activeDiagramId = activeId;
+    m_filePath = path;
+    m_modified = false;
+    emit modelChanged();
+    return true;
+}
+
+bool DocumentController::saveToFile(const QString &path, QString *errorMessage)
+{
+    if (!writeModelTo(m_model, path, errorMessage))
+        return false;
+    m_filePath = path;
+    m_modified = false;
+    return true;
+}
+
+bool DocumentController::loadSession(const QString &path, QString *errorMessage)
+{
+    Model loaded;
+    if (!loadJsonDocument(path, &loaded, errorMessage))
+        return false;
+
+    Id activeId;
+    ensureDiagram(&loaded, &activeId);
+    m_model = loaded;
+    m_activeDiagramId = activeId;
+    m_modified = false;
+    emit modelChanged();
+    return true;
+}
+
+bool DocumentController::saveSession(const QString &path, QString *errorMessage) const
+{
+    return writeModelTo(m_model, path, errorMessage);
+}
+
+void DocumentController::newDocument()
+{
+    m_model = Model();
+    Diagram diagram;
+    diagram.id = Id::create();
+    diagram.name = QStringLiteral("Main");
+    m_model.diagrams.append(diagram);
+    m_activeDiagramId = diagram.id;
+    m_filePath.clear();
+    m_modified = false;
+    emit modelChanged();
 }
 
 } // namespace bb

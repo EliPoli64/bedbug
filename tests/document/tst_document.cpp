@@ -1,5 +1,6 @@
 #include "DocumentController.h"
 
+#include <QTemporaryDir>
 #include <QtTest>
 
 namespace {
@@ -43,6 +44,8 @@ private slots:
     void addRelationshipPick_autoCreatesColumn();
     void addRelationshipPick_reusesExistingColumn();
     void duplicateTableNamesRejected();
+    void saveLoad_roundTripsDocumentAndDirtyState();
+    void sessionPersistence_doesNotTaintFileState();
 };
 
 void DocumentControllerTest::addRelationship_linksTables()
@@ -369,6 +372,72 @@ void DocumentControllerTest::duplicateTableNamesRejected()
     QVERIFY(controller.renameEntity(ordersId, QStringLiteral("orders")));
     QVERIFY(controller.renameEntity(ordersId, QStringLiteral("order_items")));
     QCOMPARE(controller.model()->findEntity(ordersId)->name, QStringLiteral("order_items"));
+}
+
+void DocumentControllerTest::saveLoad_roundTripsDocumentAndDirtyState()
+{
+    DocumentController controller;
+    const Id customerId = controller.addEntity(QStringLiteral("customer"))->id;
+    const Id ordersId = controller.addEntity(QStringLiteral("orders"))->id;
+
+    Entity *customer = byId(controller.model(), customerId);
+    Entity *orders = byId(controller.model(), ordersId);
+    Column customerPk = makeColumn("13000000-0000-0000-0000-000000000001", "id");
+    customerPk.primaryKey = true;
+    customer->columns.append(customerPk);
+    Column orderFk = makeColumn("13000000-0000-0000-0000-000000000002", "customer_id");
+    orders->columns.append(orderFk);
+    QVERIFY(controller.addRelationshipPick(RelationshipKind::OneToMany, ordersId, Id(),
+                                           customerId, Id()));
+    QVERIFY(controller.isModified());
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString path = dir.filePath(QStringLiteral("doc.json"));
+    QVERIFY(controller.saveToFile(path));
+    QVERIFY(!controller.isModified());
+    QCOMPARE(controller.filePath(), path);
+
+    DocumentController loaded;
+    QString error;
+    QVERIFY(loaded.loadFromFile(path, &error));
+    QVERIFY(!loaded.isModified());
+    QCOMPARE(loaded.filePath(), path);
+    QCOMPARE(loaded.model()->entities.size(), 2);
+    QCOMPARE(loaded.model()->relationships.size(), 1);
+    QCOMPARE(*loaded.model(), *controller.model());
+    QCOMPARE(loaded.activeDiagramId(), controller.activeDiagramId());
+
+    // Missing file -> loud failure.
+    QVERIFY(!loaded.loadFromFile(dir.filePath(QStringLiteral("missing.json")), &error));
+    QVERIFY(!error.isEmpty());
+}
+
+void DocumentControllerTest::sessionPersistence_doesNotTaintFileState()
+{
+    DocumentController controller;
+    controller.addEntity(QStringLiteral("orders"));
+
+    QTemporaryDir dir;
+    QVERIFY(dir.isValid());
+    const QString session = dir.filePath(QStringLiteral("session.json"));
+
+    // Session save must not touch dirty flag or the document file path.
+    QVERIFY(controller.saveSession(session));
+    QVERIFY(controller.isModified());
+    QVERIFY(!controller.hasFile());
+    QCOMPARE(controller.filePath(), QString());
+
+    DocumentController restored;
+    QVERIFY(restored.loadSession(session));
+    QVERIFY(!restored.isModified());
+    QVERIFY(!restored.hasFile());
+    QCOMPARE(*restored.model(), *controller.model());
+
+    restored.newDocument();
+    QVERIFY(restored.model()->entities.isEmpty());
+    QVERIFY(!restored.isModified());
+    QVERIFY(!restored.hasFile());
 }
 
 QTEST_APPLESS_MAIN(DocumentControllerTest)
