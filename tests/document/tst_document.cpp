@@ -42,6 +42,7 @@ private slots:
     void addRelationshipOneToOne_marksChildUnique();
     void addRelationshipPick_autoCreatesColumn();
     void addRelationshipPick_reusesExistingColumn();
+    void duplicateTableNamesRejected();
 };
 
 void DocumentControllerTest::addRelationship_linksTables()
@@ -344,6 +345,30 @@ void DocumentControllerTest::addRelationshipPick_reusesExistingColumn()
                                            Id()));
     QCOMPARE(child->columns.size(), 1);
     QCOMPARE(controller.model()->relationships.size(), 1);
+}
+
+void DocumentControllerTest::duplicateTableNamesRejected()
+{
+    DocumentController controller;
+
+    const Id customerId = controller.addEntity(QStringLiteral("customer"))->id;
+    QVERIFY(!customerId.isNull());
+
+    // Case-insensitive duplicate and empty names are rejected.
+    QVERIFY(!controller.addEntity(QStringLiteral("CUSTOMER")));
+    QVERIFY(!controller.addEntity(QStringLiteral("   ")));
+
+    const Id ordersId = controller.addEntity(QStringLiteral("orders"))->id;
+    QVERIFY(!ordersId.isNull());
+    QCOMPARE(controller.model()->entities.size(), 2);
+
+    // Renaming onto a sibling fails.
+    QVERIFY(!controller.renameEntity(ordersId, QStringLiteral("customer")));
+
+    // Renaming to the same name or a fresh name succeeds.
+    QVERIFY(controller.renameEntity(ordersId, QStringLiteral("orders")));
+    QVERIFY(controller.renameEntity(ordersId, QStringLiteral("order_items")));
+    QCOMPARE(controller.model()->findEntity(ordersId)->name, QStringLiteral("order_items"));
 }
 
 QTEST_APPLESS_MAIN(DocumentControllerTest)

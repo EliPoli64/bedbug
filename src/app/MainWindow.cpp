@@ -104,7 +104,15 @@ void MainWindow::createActions()
                                                    QLineEdit::Normal, QStringLiteral("table"), &ok);
         if (!ok || name.trimmed().isEmpty())
             return;
-        Entity *entity = m_document->addEntity(name.trimmed());
+        const QString trimmed = name.trimmed();
+        for (const Entity &entity : m_document->model()->entities) {
+            if (entity.name.compare(trimmed, Qt::CaseInsensitive) == 0) {
+                QMessageBox::warning(this, tr("Add Table"),
+                                     tr("A table named '%1' already exists.").arg(trimmed));
+                return;
+            }
+        }
+        Entity *entity = m_document->addEntity(trimmed);
         m_pendingSelect = entity ? entity->id : Id();
     });
 
@@ -308,8 +316,11 @@ void MainWindow::showTableContextMenu(const Id &entityId, const QPoint &globalPo
     } else if (chosen == rename) {
         const QString name = QInputDialog::getText(this, tr("Rename Table"), tr("Table name:"),
                                                    QLineEdit::Normal, entity->name);
-        if (!name.trimmed().isEmpty() && name != entity->name)
-            m_document->renameEntity(entityId, name);
+        if (name.trimmed().isEmpty() || name == entity->name)
+            return;
+        if (!m_document->renameEntity(entityId, name))
+            QMessageBox::warning(this, tr("Rename Table"),
+                                 tr("A table named '%1' already exists.").arg(name.trimmed()));
     } else if (chosen == link) {
         focusEntity(entityId);
         m_oneToManyAction->setChecked(true);

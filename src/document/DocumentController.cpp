@@ -72,9 +72,19 @@ const Diagram *DocumentController::activeDiagram() const
 
 Entity *DocumentController::addEntity(const QString &name)
 {
+    const QString trimmed = name.trimmed();
+    if (trimmed.isEmpty())
+        return nullptr;
+
+    // Table names must be unique (case-insensitive, matching typical engines).
+    for (const Entity &entity : m_model.entities) {
+        if (entity.name.compare(trimmed, Qt::CaseInsensitive) == 0)
+            return nullptr;
+    }
+
     Entity entity;
     entity.id = Id::create();
-    entity.name = name;
+    entity.name = trimmed;
     m_model.entities.append(entity);
 
     if (Diagram *diagram = activeDiagram()) {
@@ -212,12 +222,22 @@ bool DocumentController::removeColumn(const Id &entityId, const Id &columnId)
 
 bool DocumentController::renameEntity(const Id &entityId, const QString &name)
 {
-    if (name.trimmed().isEmpty())
+    const QString trimmed = name.trimmed();
+    if (trimmed.isEmpty())
         return false;
     Entity *entity = m_model.findEntity(entityId);
     if (!entity)
         return false;
-    entity->name = name;
+
+    // Renames must not collide with a sibling table.
+    for (const Entity &other : m_model.entities) {
+        if (other.id == entityId)
+            continue;
+        if (other.name.compare(trimmed, Qt::CaseInsensitive) == 0)
+            return false;
+    }
+
+    entity->name = trimmed;
     emit modelChanged();
     return true;
 }

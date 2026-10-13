@@ -163,8 +163,17 @@ Id EntityEditorPanel::columnIdAt(int row) const
 
 void EntityEditorPanel::onNameEdited()
 {
-    if (m_controller && !m_entityId.isNull() && m_controller->model()->findEntity(m_entityId))
-        m_controller->renameEntity(m_entityId, m_nameEdit->text());
+    if (!m_controller || m_entityId.isNull())
+        return;
+    const Entity *entity = m_controller->model()->findEntity(m_entityId);
+    if (!entity)
+        return;
+
+    if (!m_controller->renameEntity(m_entityId, m_nameEdit->text())) {
+        QMessageBox::warning(this, tr("Rename"),
+                             tr("Rename failed: the name is empty or already in use."));
+        refreshName();
+    }
 }
 
 void EntityEditorPanel::addColumn()
