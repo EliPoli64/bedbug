@@ -355,6 +355,7 @@ void DiagramScene::syncFromModel()
         auto *item = new RelationshipItem(relationship.id, this);
         item->setZValue(-1.0);
         item->setFlag(QGraphicsItem::ItemIsSelectable);
+        item->setAcceptedMouseButtons(Qt::NoButton);   // never grab drags meant for tables
         item->refresh();
         m_relationshipItems.insert(relationship.id, item);
         addItem(item);
