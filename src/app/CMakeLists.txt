@@ -4,6 +4,8 @@ qt_add_library(bb_editor STATIC
     ColumnEditorDialog.h
     EntityEditorPanel.cpp
     EntityEditorPanel.h
+    SettingsDialog.cpp
+    SettingsDialog.h
 )
 
 target_include_directories(bb_editor PUBLIC

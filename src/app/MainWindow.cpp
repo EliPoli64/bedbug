@@ -5,6 +5,7 @@
 #include "DocumentController.h"
 #include "EntityEditorPanel.h"
 #include "EntityItem.h"
+#include "SettingsDialog.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -287,6 +288,11 @@ void MainWindow::createMenus()
     editMenu->addAction(m_manyToManyAction);
     editMenu->addSeparator();
     editMenu->addAction(m_pointedAction);
+    editMenu->addSeparator();
+    editMenu->addAction(tr("Settings…"), this, [this] {
+        bb::SettingsDialog dialog(this);
+        dialog.exec();
+    });
 
     QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
     viewMenu->addAction(m_zoomInAction);
