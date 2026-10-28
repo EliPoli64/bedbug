@@ -327,6 +327,7 @@ void MainWindow::createDock()
 
 void MainWindow::syncScenePreservingSelection()
 {
+    m_scene->setModel(m_document->model());
     m_scene->setActiveDiagramId(m_document->activeDiagramId());
 
     Id keep;
