@@ -50,18 +50,18 @@ void EntityEditorTest::panelReflectsModelChanges()
     panel.showEntity(entityId);
 
     QVERIFY(panel.isEnabled());
-    QCOMPARE(panel.columnCount(), 0);
+    QCOMPARE(panel.columnCount(), 1);
 
     controller.addColumn(entityId, QStringLiteral("id"), bigintType(), false, true, false, true);
-    QCOMPARE(panel.columnCount(), 1);
+    QCOMPARE(panel.columnCount(), 2);
     const Id idColumnId = panel.columnIdAt(0);
     QVERIFY(!idColumnId.isNull());
 
     controller.addColumn(entityId, QStringLiteral("email"), bigintType(), false, false, true, false);
-    QCOMPARE(panel.columnCount(), 2);
+    QCOMPARE(panel.columnCount(), 3);
 
     controller.removeColumn(entityId, idColumnId);
-    QCOMPARE(panel.columnCount(), 1);
+    QCOMPARE(panel.columnCount(), 2);
 
     panel.clear();
     QVERIFY(!panel.isEnabled());
@@ -90,7 +90,7 @@ void EntityEditorTest::addColumnViaButton_showsInList()
     QVERIFY(addButton);
     QTest::mouseClick(addButton, Qt::LeftButton);
 
-    QCOMPARE(panel.columnCount(), 1);
+    QCOMPARE(panel.columnCount(), 2);
     QVERIFY(!panel.columnIdAt(0).isNull());
 
     panel.close();
@@ -108,7 +108,7 @@ void EntityEditorTest::removeColumnViaButton_removesSelected()
     controller.addColumn(entityId, QStringLiteral("id"), bigintType(), false, true, false, true);
     controller.addColumn(entityId, QStringLiteral("email"), bigintType(), false, false, true, false);
     panel.showEntity(entityId);
-    QCOMPARE(panel.columnCount(), 2);
+    QCOMPARE(panel.columnCount(), 3);
 
     auto *list = panel.findChild<QListWidget *>(QStringLiteral("columnList"));
     QVERIFY(list);
@@ -135,7 +135,7 @@ void EntityEditorTest::removeColumnViaButton_removesSelected()
     auto *removeButton = panel.findChild<QPushButton *>(QStringLiteral("removeButton"));
     QVERIFY(removeButton);
     QTest::mouseClick(removeButton, Qt::LeftButton);
-    QCOMPARE(panel.columnCount(), 1);
+    QCOMPARE(panel.columnCount(), 2);
 
     // Cancel with No: nothing is removed even though a column stays armed.
     const int before = controller.model()->findEntity(entityId)->columns.size();

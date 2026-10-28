@@ -168,7 +168,7 @@ void DocumentControllerTest::removeColumn_removesRelationshipsAndIndexes()
     // Removing an indexed column drops the index.
     QVERIFY(controller.removeColumn(childId, childOther.id));
     QCOMPARE(child->indexes.size(), 0);
-    QCOMPARE(child->columns.size(), 0);
+    QCOMPARE(child->columns.size(), 1);
 
     // Unknown column.
     QVERIFY(!controller.removeColumn(childId, Id::create()));
@@ -188,12 +188,12 @@ void DocumentControllerTest::columnCrud_addUpdateRemove()
     Column *id = controller.addColumn(entityId, QStringLiteral("id"), bigint, false, true, false,
                                       true);
     QVERIFY(id);
-    QCOMPARE(controller.model()->findEntity(entityId)->columns.size(), 1);
+    QCOMPARE(controller.model()->findEntity(entityId)->columns.size(), 2);
 
     Column *email =
         controller.addColumn(entityId, QStringLiteral("email"), varchar, false, false, true, false);
     QVERIFY(email);
-    QCOMPARE(controller.model()->findEntity(entityId)->columns.size(), 2);
+    QCOMPARE(controller.model()->findEntity(entityId)->columns.size(), 3);
 
     // Update: change type + nullability; id must be preserved.
     const Id emailId = email->id;
@@ -214,7 +214,7 @@ void DocumentControllerTest::columnCrud_addUpdateRemove()
 
     // Remove works and cascades the entity's columns.
     QVERIFY(controller.removeColumn(entityId, emailId));
-    QCOMPARE(controller.model()->findEntity(entityId)->columns.size(), 1);
+    QCOMPARE(controller.model()->findEntity(entityId)->columns.size(), 2);
 
     // Unknown entity.
     QVERIFY(!controller.addColumn(Id::create(), QStringLiteral("x"), bigint, true, false, false, false));
@@ -244,7 +244,7 @@ void DocumentControllerTest::duplicateColumnNamesRejected()
 
     renamed.name = QStringLiteral("public_email");
     QVERIFY(controller.updateColumn(entityId, renamed));
-    QCOMPARE(controller.model()->findEntity(entityId)->columns.size(), 2);
+    QCOMPARE(controller.model()->findEntity(entityId)->columns.size(), 3);
 }
 
 void DocumentControllerTest::createManyToMany_buildsJunction()
@@ -295,14 +295,14 @@ void DocumentControllerTest::addRelationshipOneToOne_marksChildUnique()
     Column childFk = makeColumn("0f000000-0000-0000-0000-000000000002", "customer_id");
     parent->columns.append(parentPk);
     child->columns.append(childFk);
-    QVERIFY(!child->columns.first().unique);
+    QVERIFY(!child->columns.at(1).unique);
 
     Relationship *relationship =
         controller.addRelationship(RelationshipKind::OneToOne, childId, {childFk.id}, parentId,
                                    {parentPk.id});
     QVERIFY(relationship);
     QVERIFY(relationship->identifying);
-    QVERIFY(child->columns.first().unique);
+    QVERIFY(child->columns.at(1).unique);
 }
 
 void DocumentControllerTest::addRelationshipPick_autoCreatesColumn()
@@ -313,21 +313,25 @@ void DocumentControllerTest::addRelationshipPick_autoCreatesColumn()
 
     Entity *parent = byId(controller.model(), parentId);
     Entity *child = byId(controller.model(), childId);
-    Column parentPk = makeColumn("11000000-0000-0000-0000-000000000001", "id");
-    parentPk.primaryKey = true;
-    parent->columns.append(parentPk);
-    QVERIFY(child->columns.isEmpty());
+    // parent already has an auto PK "customerID"; use it as the referenced key.
+    Column *parentPk = parent->columns.isEmpty() ? nullptr : &parent->columns.first();
+    QVERIFY(parentPk);
+    parentPk->primaryKey = true;
+    QVERIFY(child->columns.size() == 1);
+    const Column &autoPk = child->columns.first();
+    QVERIFY(autoPk.primaryKey);
 
     // No explicit columns: the child FK "customer_id" is created automatically.
     Relationship *relationship =
         controller.addRelationshipPick(RelationshipKind::OneToMany, childId, Id(), parentId, Id());
     QVERIFY(relationship);
-    QCOMPARE(child->columns.size(), 1);
-    const Column &created = child->columns.first();
-    QCOMPARE(created.name, QStringLiteral("customer_id"));
-    QVERIFY(created.nullable);
-    QVERIFY(created.type == parentPk.type);
-    QCOMPARE(relationship->parentColumns, QList<Id>{parentPk.id});
+    QCOMPARE(child->columns.size(), 2);
+    const Column *created = child->findColumn(relationship->childColumns.first());
+    QVERIFY(created);
+    QCOMPARE(created->name, QStringLiteral("customer_id"));
+    QVERIFY(created->nullable);
+    QVERIFY(created->type == parentPk->type);
+    QCOMPARE(relationship->parentColumns, QList<Id>{parentPk->id});
     QCOMPARE(controller.model()->relationships.size(), 1);
 }
 
@@ -348,7 +352,7 @@ void DocumentControllerTest::addRelationshipPick_reusesExistingColumn()
     // A column named "customer_id" already exists: it is reused, not duplicated.
     QVERIFY(controller.addRelationshipPick(RelationshipKind::OneToMany, childId, Id(), parentId,
                                            Id()));
-    QCOMPARE(child->columns.size(), 1);
+    QCOMPARE(child->columns.size(), 2);
     QCOMPARE(controller.model()->relationships.size(), 1);
 }
 

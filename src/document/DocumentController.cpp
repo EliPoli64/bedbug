@@ -5,6 +5,7 @@
 #include <QFile>
 #include <QJsonDocument>
 #include <QRectF>
+#include <QSettings>
 
 namespace bb {
 
@@ -144,6 +145,24 @@ Entity *DocumentController::addEntity(const QString &name)
     Entity entity;
     entity.id = Id::create();
     entity.name = trimmed;
+
+    // Spawn with a primary key by default. The name format is configurable via
+    // QSettings ("defaultPkFormat", default "{table}ID", {table} lowercased).
+    const QString format = QSettings().value(QStringLiteral("defaultPkFormat"),
+                                             QStringLiteral("{table}ID")).toString();
+    QString pkName = format.isEmpty() ? QStringLiteral("{table}ID") : format;
+    pkName.replace(QStringLiteral("{table}"), trimmed.toLower());
+
+    Column primaryKey;
+    primaryKey.id = Id::create();
+    primaryKey.name = pkName;
+    primaryKey.type.kind = CanonicalType::Kind::BigInt;
+    primaryKey.nullable = false;
+    primaryKey.primaryKey = true;
+    primaryKey.unique = true;
+    primaryKey.autoIncrement = true;
+    entity.columns.append(primaryKey);
+
     m_model.entities.append(entity);
 
     if (Diagram *diagram = activeDiagram()) {
