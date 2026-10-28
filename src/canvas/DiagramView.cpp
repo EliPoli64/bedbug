@@ -146,11 +146,12 @@ void DiagramView::mouseReleaseEvent(QMouseEvent *event)
         m_rightPanning = false;
         viewport()->setCursor(Qt::ArrowCursor);
         if (!m_rightMoved) {
-            // Deliver the context menu ourselves (press was consumed for panning).
-            m_contextMenuSynthesized = true;
+            // Show the context menu ourselves; suppress the platform duplicate.
+            m_suppressContextMenu = true;
             QContextMenuEvent menuEvent(QContextMenuEvent::Mouse, event->pos(),
                                         event->globalPosition().toPoint());
-            contextMenuEvent(&menuEvent);
+            QGraphicsView::contextMenuEvent(&menuEvent);
+            m_suppressContextMenu = false;
         }
         event->accept();
         return;
@@ -166,9 +167,8 @@ void DiagramView::mouseReleaseEvent(QMouseEvent *event)
 
 void DiagramView::contextMenuEvent(QContextMenuEvent *event)
 {
-    // Swallow the platform-generated event for the interaction we already handled.
-    if (m_contextMenuSynthesized) {
-        m_contextMenuSynthesized = false;
+    if (m_suppressContextMenu) {
+        m_suppressContextMenu = false;
         event->accept();
         return;
     }
@@ -181,8 +181,17 @@ void DiagramView::contextMenuEvent(QContextMenuEvent *event)
 
 void DiagramView::panBy(const QPoint &delta)
 {
-    horizontalScrollBar()->setValue(horizontalScrollBar()->value() - delta.x());
-    verticalScrollBar()->setValue(verticalScrollBar()->value() - delta.y());
+    auto *horizontal = horizontalScrollBar();
+    auto *vertical = verticalScrollBar();
+    if (horizontal->maximum() > horizontal->minimum()
+        || vertical->maximum() > vertical->minimum()) {
+        horizontal->setValue(horizontal->value() - delta.x());
+        vertical->setValue(vertical->value() - delta.y());
+    } else {
+        // Scene fits in the viewport: pan by translating the view so dragging
+        // always moves the canvas, regardless of scroll-bar range.
+        translate(delta.x(), delta.y());
+    }
 }
 
 void DiagramView::drawBackground(QPainter *painter, const QRectF &rect)

@@ -39,7 +39,7 @@ private:
     bool m_rightPanning = false;   // right-drag pans the canvas
     QPoint m_rightPressPos;
     bool m_rightMoved = false;
-    bool m_contextMenuSynthesized = false;
+    bool m_suppressContextMenu = false;
 };
 
 } // namespace bb

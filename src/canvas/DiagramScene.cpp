@@ -200,8 +200,8 @@ QRectF DiagramScene::scrollableRect() const
     const QRectF canvas = canvasRect();
     // A generous margin so the canvas can always be panned freely, even when the
     // page grid is smaller than the viewport.
-    return canvas.adjusted(-kSheetWidth * 4, -kSheetHeight * 4, kSheetWidth * 4,
-                           kSheetHeight * 4);
+    return canvas.adjusted(-kSheetWidth * 20, -kSheetHeight * 20, kSheetWidth * 20,
+                           kSheetHeight * 20);
 }
 
 int DiagramScene::pagesX() const
