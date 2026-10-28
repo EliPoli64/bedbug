@@ -46,6 +46,8 @@ private slots:
     void duplicateTableNamesRejected();
     void saveLoad_roundTripsDocumentAndDirtyState();
     void sessionPersistence_doesNotTaintFileState();
+    void sheetGrid_addsAndRemovesInAllDirections();
+    void sheetGrid_removalGuarded();
 };
 
 void DocumentControllerTest::addRelationship_linksTables()
@@ -438,6 +440,71 @@ void DocumentControllerTest::sessionPersistence_doesNotTaintFileState()
     QVERIFY(restored.model()->entities.isEmpty());
     QVERIFY(!restored.isModified());
     QVERIFY(!restored.hasFile());
+}
+
+void DocumentControllerTest::sheetGrid_addsAndRemovesInAllDirections()
+{
+    DocumentController controller;
+    QCOMPARE(controller.activeDiagram()->pagesX, 1);
+    QCOMPARE(controller.activeDiagram()->pagesY, 1);
+    QCOMPARE(controller.activeDiagram()->originX, 0);
+    QCOMPARE(controller.activeDiagram()->originY, 0);
+
+    controller.addSheetLeft();
+    QCOMPARE(controller.activeDiagram()->pagesX, 2);
+    QCOMPARE(controller.activeDiagram()->originX, -1);
+
+    controller.addSheetRight();
+    QCOMPARE(controller.activeDiagram()->pagesX, 3);
+
+    controller.addSheetUp();
+    QCOMPARE(controller.activeDiagram()->pagesY, 2);
+    QCOMPARE(controller.activeDiagram()->originY, -1);
+
+    controller.addSheetDown();
+    QCOMPARE(controller.activeDiagram()->pagesY, 3);
+
+    // Remove right.
+    controller.removeSheetRight();
+    QCOMPARE(controller.activeDiagram()->pagesX, 2);
+    QCOMPARE(controller.activeDiagram()->originX, -1);
+
+    // Remove left.
+    controller.removeSheetLeft();
+    QCOMPARE(controller.activeDiagram()->pagesX, 1);
+    QCOMPARE(controller.activeDiagram()->originX, 0);
+
+    controller.removeSheetUp();
+    QCOMPARE(controller.activeDiagram()->pagesY, 2);
+    QCOMPARE(controller.activeDiagram()->originY, 0);
+
+    controller.removeSheetDown();
+    QCOMPARE(controller.activeDiagram()->pagesY, 1);
+    QCOMPARE(controller.activeDiagram()->originY, 0);
+}
+
+void DocumentControllerTest::sheetGrid_removalGuarded()
+{
+    DocumentController controller;
+    const Id entityId = controller.addEntity(QStringLiteral("t"))->id;
+    Entity *entity = byId(controller.model(), entityId);
+    entity->columns.append(makeColumn("99000000-0000-0000-0000-000000000001", "id"));
+    // Place the entity on the second sheet (right of origin).
+    controller.activeDiagram()->nodes.first().pos =
+        QPointF(Diagram::kSheetWidth + 10.0, Diagram::kSheetHeight + 10.0);
+
+    // A single sheet cannot be removed.
+    controller.addSheetRight();
+    controller.addSheetDown();
+    const int pagesXBefore = controller.activeDiagram()->pagesX;
+    controller.removeSheetLeft();   // content is on the right sheet; left sheet empty -> allowed
+    // Actually left sheet (origin) is empty -> removed; pagesX decrements.
+    QCOMPARE(controller.activeDiagram()->pagesX, pagesXBefore - 1);
+
+    // Removing the sheet that holds content is blocked.
+    const int pagesYBefore = controller.activeDiagram()->pagesY;
+    controller.removeSheetDown();   // the bottom sheet contains the entity -> blocked
+    QCOMPARE(controller.activeDiagram()->pagesY, pagesYBefore);
 }
 
 QTEST_APPLESS_MAIN(DocumentControllerTest)

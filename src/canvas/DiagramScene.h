@@ -21,6 +21,8 @@ class DiagramScene : public QGraphicsScene
 
 public:
     static constexpr qreal kGridSize = 20.0;
+    static constexpr qreal kSheetWidth = Diagram::kSheetWidth;
+    static constexpr qreal kSheetHeight = Diagram::kSheetHeight;
 
     explicit DiagramScene(QObject *parent = nullptr);
 
@@ -38,6 +40,17 @@ public:
 
     // The active Diagram within m_model, or nullptr.
     Diagram *currentDiagram();
+
+    // Working-space ("sheet") grid for the active diagram.
+    QRectF canvasRect() const;
+    int pagesX() const;
+    int pagesY() const;
+    int originX() const;
+    int originY() const;
+
+    // Expands the sheet grid so it fully contains `rect` (grows by one sheet per
+    // overflowing direction). Marks the document dirty via the callback.
+    void expandCanvasToFit(const QRectF &rect);
 
     bool snapToGrid() const { return m_snapToGrid; }
     void setSnapToGrid(bool enabled) { m_snapToGrid = enabled; }
@@ -59,17 +72,23 @@ public:
                            RelationshipKind kind)>
             handler);
 
+    // Marks the document dirty without rebuilding (used by canvas auto-grow).
+    void setMarkDirtyCallback(std::function<void()> callback);
+
     // Processes one link-mode click at a scene position. Returns true when handled.
     bool handleLinkAt(const QPointF &scenePos);
 
     // Processes a context-menu request at a scene position. Returns true when it landed
-    // on a table (emitting tableContextMenuRequested).
+    // on a table (emitting tableContextMenuRequested). When it lands on empty space,
+    // emits canvasContextMenuRequested instead.
     bool handleTableContextMenu(const QPointF &scenePos, const QPoint &globalPos);
 
 signals:
     void entityMoved(const Id &entityId, const QPointF &pos);
     void linkStatusChanged(const QString &text);
     void tableContextMenuRequested(const Id &entityId, const QPoint &globalPos);
+    void canvasContextMenuRequested(const QPoint &globalPos);
+    void canvasChanged();
 
 protected:
     void mousePressEvent(QGraphicsSceneMouseEvent *event) override;
@@ -93,6 +112,7 @@ private:
     std::function<bool(const Id &, const QList<Id> &, const Id &, const QList<Id> &,
                        RelationshipKind)>
         m_relationshipHandler;
+    std::function<void()> m_markDirtyCallback;
 };
 
 } // namespace bb

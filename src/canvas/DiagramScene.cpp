@@ -181,6 +181,78 @@ bool DiagramScene::handleLinkAt(const QPointF &scenePos)
     return true;
 }
 
+void DiagramScene::setMarkDirtyCallback(std::function<void()> callback)
+{
+    m_markDirtyCallback = std::move(callback);
+}
+
+QRectF DiagramScene::canvasRect() const
+{
+    Diagram *diagram = const_cast<DiagramScene *>(this)->findDiagram();
+    if (!diagram)
+        return QRectF(0, 0, kSheetWidth, kSheetHeight);
+    return QRectF(diagram->originX * kSheetWidth, diagram->originY * kSheetHeight,
+                  diagram->pagesX * kSheetWidth, diagram->pagesY * kSheetHeight);
+}
+
+int DiagramScene::pagesX() const
+{
+    const Diagram *diagram = const_cast<DiagramScene *>(this)->findDiagram();
+    return diagram ? diagram->pagesX : 1;
+}
+
+int DiagramScene::pagesY() const
+{
+    const Diagram *diagram = const_cast<DiagramScene *>(this)->findDiagram();
+    return diagram ? diagram->pagesY : 1;
+}
+
+int DiagramScene::originX() const
+{
+    const Diagram *diagram = const_cast<DiagramScene *>(this)->findDiagram();
+    return diagram ? diagram->originX : 0;
+}
+
+int DiagramScene::originY() const
+{
+    const Diagram *diagram = const_cast<DiagramScene *>(this)->findDiagram();
+    return diagram ? diagram->originY : 0;
+}
+
+void DiagramScene::expandCanvasToFit(const QRectF &rect)
+{
+    Diagram *diagram = findDiagram();
+    if (!diagram)
+        return;
+
+    bool changed = false;
+    const qreal width = kSheetWidth;
+    const qreal height = kSheetHeight;
+    while (rect.right() > diagram->originX * width + diagram->pagesX * width) {
+        diagram->pagesX += 1;
+        changed = true;
+    }
+    while (rect.left() < diagram->originX * width) {
+        diagram->originX -= 1;
+        diagram->pagesX += 1;
+        changed = true;
+    }
+    while (rect.bottom() > diagram->originY * height + diagram->pagesY * height) {
+        diagram->pagesY += 1;
+        changed = true;
+    }
+    while (rect.top() < diagram->originY * height) {
+        diagram->originY -= 1;
+        diagram->pagesY += 1;
+        changed = true;
+    }
+    if (changed) {
+        if (m_markDirtyCallback)
+            m_markDirtyCallback();
+        emit canvasChanged();
+    }
+}
+
 bool DiagramScene::handleTableContextMenu(const QPointF &scenePos, const QPoint &globalPos)
 {
     EntityItem *entityItem = nullptr;
@@ -191,8 +263,10 @@ bool DiagramScene::handleTableContextMenu(const QPointF &scenePos, const QPoint 
             break;
         }
     }
-    if (!entityItem)
+    if (!entityItem) {
+        emit canvasContextMenuRequested(globalPos);
         return false;
+    }
 
     emit tableContextMenuRequested(entityItem->entityId(), globalPos);
     return true;
@@ -253,6 +327,8 @@ void DiagramScene::syncFromModel()
         item->setOnMoved([this, entityId](const QPointF &pos) {
             if (DiagramNode *node = nodeFor(findDiagram(), entityId))
                 node->pos = pos;
+            if (EntityItem *item = itemForEntity(entityId))
+                expandCanvasToFit(item->mapToScene(item->boundingRect()).boundingRect());
             refreshRelationships();
             emit entityMoved(entityId, pos);
         });
@@ -273,6 +349,11 @@ void DiagramScene::syncFromModel()
         m_relationshipItems.insert(relationship.id, item);
         addItem(item);
     }
+
+    // Grow the canvas to fit whatever was placed, then bound scrolling to it.
+    for (EntityItem *item : std::as_const(m_items))
+        expandCanvasToFit(item->mapToScene(item->boundingRect()).boundingRect());
+    setSceneRect(canvasRect());
 }
 
 } // namespace bb

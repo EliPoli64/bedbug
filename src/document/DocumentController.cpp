@@ -4,6 +4,7 @@
 
 #include <QFile>
 #include <QJsonDocument>
+#include <QRectF>
 
 namespace bb {
 
@@ -587,6 +588,128 @@ void DocumentController::newDocument()
     m_activeDiagramId = diagram.id;
     m_filePath.clear();
     m_modified = false;
+    emit modelChanged();
+}
+
+namespace {
+
+bool sheetHasNodes(const Diagram &diagram, int sheetX, int sheetY, qreal sheetWidth,
+                   qreal sheetHeight)
+{
+    const qreal left = sheetX * sheetWidth;
+    const qreal top = sheetY * sheetHeight;
+    const QRectF sheetRect(left, top, sheetWidth, sheetHeight);
+    for (const DiagramNode &node : diagram.nodes) {
+        if (sheetRect.contains(node.pos))
+            return true;
+    }
+    return false;
+}
+
+} // namespace
+
+void DocumentController::addSheetLeft()
+{
+    if (Diagram *diagram = activeDiagram()) {
+        diagram->originX -= 1;
+        diagram->pagesX += 1;
+        markModifiedAndNotify();
+    }
+}
+
+void DocumentController::addSheetRight()
+{
+    if (Diagram *diagram = activeDiagram()) {
+        diagram->pagesX += 1;
+        markModifiedAndNotify();
+    }
+}
+
+void DocumentController::addSheetUp()
+{
+    if (Diagram *diagram = activeDiagram()) {
+        diagram->originY -= 1;
+        diagram->pagesY += 1;
+        markModifiedAndNotify();
+    }
+}
+
+void DocumentController::addSheetDown()
+{
+    if (Diagram *diagram = activeDiagram()) {
+        diagram->pagesY += 1;
+        markModifiedAndNotify();
+    }
+}
+
+void DocumentController::removeSheetLeft()
+{
+    if (Diagram *diagram = activeDiagram()) {
+        if (diagram->pagesX <= 1)
+            return;
+        // Block removal when the leftmost column still holds content.
+        for (int y = 0; y < diagram->pagesY; ++y) {
+            if (sheetHasNodes(*diagram, diagram->originX, diagram->originY + y,
+                              Diagram::kSheetWidth, Diagram::kSheetHeight))
+                return;
+        }
+        diagram->originX += 1;
+        diagram->pagesX -= 1;
+        markModifiedAndNotify();
+    }
+}
+
+void DocumentController::removeSheetRight()
+{
+    if (Diagram *diagram = activeDiagram()) {
+        if (diagram->pagesX <= 1)
+            return;
+        const int lastSheetX = diagram->originX + diagram->pagesX - 1;
+        for (int y = 0; y < diagram->pagesY; ++y) {
+            if (sheetHasNodes(*diagram, lastSheetX, diagram->originY + y,
+                              Diagram::kSheetWidth, Diagram::kSheetHeight))
+                return;
+        }
+        diagram->pagesX -= 1;
+        markModifiedAndNotify();
+    }
+}
+
+void DocumentController::removeSheetUp()
+{
+    if (Diagram *diagram = activeDiagram()) {
+        if (diagram->pagesY <= 1)
+            return;
+        for (int x = 0; x < diagram->pagesX; ++x) {
+            if (sheetHasNodes(*diagram, diagram->originX + x, diagram->originY,
+                              Diagram::kSheetWidth, Diagram::kSheetHeight))
+                return;
+        }
+        diagram->originY += 1;
+        diagram->pagesY -= 1;
+        markModifiedAndNotify();
+    }
+}
+
+void DocumentController::removeSheetDown()
+{
+    if (Diagram *diagram = activeDiagram()) {
+        if (diagram->pagesY <= 1)
+            return;
+        const int lastSheetY = diagram->originY + diagram->pagesY - 1;
+        for (int x = 0; x < diagram->pagesX; ++x) {
+            if (sheetHasNodes(*diagram, diagram->originX + x, lastSheetY,
+                              Diagram::kSheetWidth, Diagram::kSheetHeight))
+                return;
+        }
+        diagram->pagesY -= 1;
+        markModifiedAndNotify();
+    }
+}
+
+void DocumentController::markDirty()
+{
+    m_modified = true;
     emit modelChanged();
 }
 

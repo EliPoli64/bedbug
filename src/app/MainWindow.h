@@ -30,6 +30,7 @@ private:
     void addColumnToEntity(const Id &entityId);
     void removeTable(const Id &entityId);
     void showTableContextMenu(const Id &entityId, const QPoint &globalPos);
+    void showCanvasContextMenu(const QPoint &globalPos);
 
     // File actions.
     void openDocument();
@@ -63,6 +64,11 @@ protected:
     QAction *m_zoomOutAction = nullptr;
     QAction *m_fitAction = nullptr;
     QAction *m_snapAction = nullptr;
+    QAction *m_addSheetLeftAction = nullptr;
+    QAction *m_addSheetRightAction = nullptr;
+    QAction *m_addSheetUpAction = nullptr;
+    QAction *m_addSheetDownAction = nullptr;
+    QAction *m_removeSheetAction = nullptr;
     Id m_pendingSelect;
 };
 

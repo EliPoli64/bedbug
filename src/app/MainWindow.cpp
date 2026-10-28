@@ -84,7 +84,12 @@ MainWindow::MainWindow(QWidget *parent)
     });
     connect(m_scene, &DiagramScene::tableContextMenuRequested, this,
             &MainWindow::showTableContextMenu);
-
+    connect(m_scene, &DiagramScene::canvasContextMenuRequested, this,
+            &MainWindow::showCanvasContextMenu);
+    connect(m_scene, &DiagramScene::canvasChanged, this, [this] {
+        m_view->setSceneRect(m_scene->canvasRect());
+        updateStatusMessage();
+    });
     createActions();
     createDock();
     createToolBars();
@@ -205,6 +210,26 @@ void MainWindow::createActions()
     m_snapAction->setCheckable(true);
     m_snapAction->setChecked(false);   // free dragging by default
     connect(m_snapAction, &QAction::toggled, m_scene, &DiagramScene::setSnapToGrid);
+
+    m_addSheetLeftAction = new QAction(tr("Add Sheet Left"), this);
+    m_addSheetRightAction = new QAction(tr("Add Sheet Right"), this);
+    m_addSheetUpAction = new QAction(tr("Add Sheet Above"), this);
+    m_addSheetDownAction = new QAction(tr("Add Sheet Below"), this);
+    m_removeSheetAction = new QAction(tr("Remove Last Sheet"), this);
+    connect(m_addSheetLeftAction, &QAction::triggered, m_document, &DocumentController::addSheetLeft);
+    connect(m_addSheetRightAction, &QAction::triggered, m_document, &DocumentController::addSheetRight);
+    connect(m_addSheetUpAction, &QAction::triggered, m_document, &DocumentController::addSheetUp);
+    connect(m_addSheetDownAction, &QAction::triggered, m_document, &DocumentController::addSheetDown);
+    connect(m_removeSheetAction, &QAction::triggered, this, [this] {
+        if (m_scene->pagesX() > 1)
+            m_document->removeSheetRight();
+        else if (m_scene->pagesY() > 1)
+            m_document->removeSheetDown();
+        else if (m_scene->originX() < 0)
+            m_document->removeSheetLeft();
+        else if (m_scene->originY() < 0)
+            m_document->removeSheetUp();
+    });
 }
 
 void MainWindow::createToolBars()
@@ -225,6 +250,13 @@ void MainWindow::createToolBars()
     toolBar->addAction(m_fitAction);
     toolBar->addSeparator();
     toolBar->addAction(m_snapAction);
+    toolBar->addSeparator();
+    toolBar->addAction(m_addSheetLeftAction);
+    toolBar->addAction(m_addSheetRightAction);
+    toolBar->addAction(m_addSheetUpAction);
+    toolBar->addAction(m_addSheetDownAction);
+    toolBar->addSeparator();
+    toolBar->addAction(m_removeSheetAction);
 }
 
 void MainWindow::createMenus()
@@ -253,6 +285,14 @@ void MainWindow::createMenus()
     viewMenu->addAction(m_fitAction);
     viewMenu->addSeparator();
     viewMenu->addAction(m_snapAction);
+    viewMenu->addSeparator();
+    QMenu *sheetsMenu = viewMenu->addMenu(tr("Sheets"));
+    sheetsMenu->addAction(m_addSheetLeftAction);
+    sheetsMenu->addAction(m_addSheetRightAction);
+    sheetsMenu->addAction(m_addSheetUpAction);
+    sheetsMenu->addAction(m_addSheetDownAction);
+    sheetsMenu->addSeparator();
+    sheetsMenu->addAction(m_removeSheetAction);
     if (auto *dock = qobject_cast<QDockWidget *>(m_entityPanel->parentWidget()))
         viewMenu->addAction(dock->toggleViewAction());
 }
@@ -283,11 +323,27 @@ void MainWindow::syncScenePreservingSelection()
     updateStatusMessage();
 }
 
+void MainWindow::showCanvasContextMenu(const QPoint &globalPos)
+{
+    QMenu menu(this);
+    QMenu *addSheetMenu = menu.addMenu(tr("Add Sheet"));
+    addSheetMenu->addAction(m_addSheetLeftAction);
+    addSheetMenu->addAction(m_addSheetRightAction);
+    addSheetMenu->addAction(m_addSheetUpAction);
+    addSheetMenu->addAction(m_addSheetDownAction);
+    menu.addSeparator();
+    menu.addAction(m_removeSheetAction);
+    menu.exec(globalPos);
+}
+
 void MainWindow::updateStatusMessage()
 {
-    statusBar()->showMessage(tr("%1 table(s), %2 relationship(s)")
-                                 .arg(m_document->model()->entities.size())
-                                 .arg(m_document->model()->relationships.size()));
+    statusBar()->showMessage(
+        tr("%1 table(s), %2 relationship(s), %3×%4 sheets")
+            .arg(m_document->model()->entities.size())
+            .arg(m_document->model()->relationships.size())
+            .arg(m_scene->pagesX())
+            .arg(m_scene->pagesY()));
 }
 
 void MainWindow::focusEntity(const Id &entityId)

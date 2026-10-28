@@ -121,6 +121,10 @@ private slots:
     void tableClicks_resolveColumnsViaHandler();
     void relationshipItem_cardinalityDerivedFromUniqueness();
     void contextMenu_onTableEmitsRequest();
+    void canvasRect_defaultA4();
+    void expandCanvasToFit_grows();
+    void autoGrow_onMove();
+    void canvasContextMenu_onEmptySpace();
     void crowsfoot_markersRenderDistinctly();
 };
 
@@ -542,6 +546,81 @@ void CanvasTest::contextMenu_onTableEmitsRequest()
     emitted = false;
     QVERIFY(!scene.handleTableContextMenu(QPointF(9000, 9000), QPoint()));
     QVERIFY(!emitted);
+
+    delete model;
+}
+
+void CanvasTest::canvasRect_defaultA4()
+{
+    Model *model = new Model(twoEntitySceneModel());
+    DiagramScene scene;
+    scene.setModel(model);
+    scene.setActiveDiagramId(model->diagrams.first().id);
+    scene.syncFromModel();
+
+    const QRectF rect = scene.canvasRect();
+    QCOMPARE(rect, QRectF(0, 0, DiagramScene::kSheetWidth, DiagramScene::kSheetHeight));
+    QCOMPARE(scene.pagesX(), 1);
+    QCOMPARE(scene.pagesY(), 1);
+    QCOMPARE(scene.originX(), 0);
+    QCOMPARE(scene.originY(), 0);
+
+    delete model;
+}
+
+void CanvasTest::expandCanvasToFit_grows()
+{
+    Model *model = new Model(twoEntitySceneModel());
+    DiagramScene scene;
+    scene.setModel(model);
+    scene.setActiveDiagramId(model->diagrams.first().id);
+    scene.syncFromModel();
+
+    const int pagesXBefore = scene.pagesX();
+    const int pagesYBefore = scene.pagesY();
+
+    // A rect well past the right/bottom edge of the single default sheet.
+    scene.expandCanvasToFit(QRectF(DiagramScene::kSheetWidth * 2 + 50,
+                                  DiagramScene::kSheetHeight * 2 + 50, 10, 10));
+    QVERIFY(scene.pagesX() > pagesXBefore);
+    QVERIFY(scene.pagesY() > pagesYBefore);
+    QVERIFY(scene.canvasRect().width() > DiagramScene::kSheetWidth);
+
+    delete model;
+}
+
+void CanvasTest::autoGrow_onMove()
+{
+    Model *model = new Model(twoEntitySceneModel());
+    DiagramScene scene;
+    scene.setModel(model);
+    scene.setActiveDiagramId(model->diagrams.first().id);
+    scene.syncFromModel();
+
+    const int pagesBefore = scene.pagesX();
+    const Id customerId = model->entities.constFirst().id;
+    EntityItem *item = scene.itemForEntity(customerId);
+    item->setPos(QPointF(DiagramScene::kSheetWidth * 2 + 100, 100));
+    // The move callback auto-grows the canvas.
+    QVERIFY(scene.pagesX() > pagesBefore);
+
+    delete model;
+}
+
+void CanvasTest::canvasContextMenu_onEmptySpace()
+{
+    Model *model = new Model(twoEntitySceneModel());
+    DiagramScene scene;
+    scene.setModel(model);
+    scene.setActiveDiagramId(model->diagrams.first().id);
+    scene.syncFromModel();
+
+    bool emitted = false;
+    connect(&scene, &DiagramScene::canvasContextMenuRequested, this,
+            [&emitted] { emitted = true; });
+
+    QVERIFY(!scene.handleTableContextMenu(QPointF(9000, 9000), QPoint(1, 2)));
+    QVERIFY(emitted);
 
     delete model;
 }

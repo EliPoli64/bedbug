@@ -40,6 +40,25 @@ public:
     // Resets to a fresh document with one empty diagram.
     void newDocument();
 
+    // --- Working-space ("sheet") grid ---------------------------------------
+
+    // Adds one A4 sheet to the active diagram in the given direction and emits
+    // modelChanged().
+    void addSheetLeft();
+    void addSheetRight();
+    void addSheetUp();
+    void addSheetDown();
+
+    // Removes the last sheet on the given side, but only when more than one sheet
+    // remains in that direction and the sheet contains no entity nodes.
+    void removeSheetLeft();
+    void removeSheetRight();
+    void removeSheetUp();
+    void removeSheetDown();
+
+    // Marks the document dirty without rebuilding (used by canvas auto-grow).
+    void markDirty();
+
     bool isModified() const { return m_modified; }
     bool hasFile() const { return !m_filePath.isEmpty(); }
     QString filePath() const { return m_filePath; }

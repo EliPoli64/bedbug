@@ -49,6 +49,10 @@ constexpr QLatin1StringView kKeyNodes            {"nodes"};
 constexpr QLatin1StringView kKeyEntity           {"entity"};
 constexpr QLatin1StringView kKeyPos              {"pos"};
 constexpr QLatin1StringView kKeyZoom             {"zoom"};
+constexpr QLatin1StringView kKeyPagesX           {"pagesX"};
+constexpr QLatin1StringView kKeyPagesY           {"pagesY"};
+constexpr QLatin1StringView kKeyOriginX          {"originX"};
+constexpr QLatin1StringView kKeyOriginY          {"originY"};
 
 // ---- Serialization ---------------------------------------------------------
 
@@ -176,6 +180,15 @@ QJsonObject diagramToJson(const Diagram &diagram)
     obj.insert(kKeyNodes, nodes);
 
     obj.insert(kKeyZoom, diagram.zoom);
+    // Page grid (MySQL Workbench style).
+    if (diagram.pagesX != 1)
+        obj.insert(kKeyPagesX, diagram.pagesX);
+    if (diagram.pagesY != 1)
+        obj.insert(kKeyPagesY, diagram.pagesY);
+    if (diagram.originX != 0)
+        obj.insert(kKeyOriginX, diagram.originX);
+    if (diagram.originY != 0)
+        obj.insert(kKeyOriginY, diagram.originY);
     return obj;
 }
 
@@ -478,6 +491,20 @@ bool parseDiagram(const QJsonObject &obj, Diagram *out, QString *err, const QStr
     }
 
     out->zoom = obj.value(kKeyZoom).toDouble(1.0);
+
+    const QJsonValue pagesXValue = obj.value(kKeyPagesX);
+    if (pagesXValue.isDouble())
+        out->pagesX = qMax(1, static_cast<int>(pagesXValue.toDouble()));
+    const QJsonValue pagesYValue = obj.value(kKeyPagesY);
+    if (pagesYValue.isDouble())
+        out->pagesY = qMax(1, static_cast<int>(pagesYValue.toDouble()));
+    const QJsonValue originXValue = obj.value(kKeyOriginX);
+    if (originXValue.isDouble())
+        out->originX = static_cast<int>(originXValue.toDouble());
+    const QJsonValue originYValue = obj.value(kKeyOriginY);
+    if (originYValue.isDouble())
+        out->originY = static_cast<int>(originYValue.toDouble());
+
     return true;
 }
 

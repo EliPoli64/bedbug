@@ -186,23 +186,68 @@ void DiagramView::panBy(const QPoint &delta)
 
 void DiagramView::drawBackground(QPainter *painter, const QRectF &rect)
 {
-    Q_UNUSED(rect);
+    // Workspace background (grey), with white A4 sheets laid out on a grid.
+    painter->fillRect(rect, QColor(232, 232, 232));
 
-    const qreal grid = DiagramScene::kGridSize;
-    const QRectF visible =
-        mapToScene(viewport()->rect()).boundingRect().adjusted(-grid, -grid, grid, grid);
+    auto *diagramScene = dynamic_cast<DiagramScene *>(scene());
+    if (!diagramScene)
+        return;
 
-    // Dotted grid — subtle, keeps focus on the diagram.
-    QColor dotColor = palette().color(QPalette::Mid);
-    dotColor.setAlpha(70);
+    const int pagesX = diagramScene->pagesX();
+    const int pagesY = diagramScene->pagesY();
+    const int originX = diagramScene->originX();
+    const int originY = diagramScene->originY();
+    const qreal sheetWidth = DiagramScene::kSheetWidth;
+    const qreal sheetHeight = DiagramScene::kSheetHeight;
+
+    const QColor pageColor = palette().color(QPalette::Base);
+    const QColor pageBorder = palette().color(QPalette::Mid);
+    QColor pageShadow = Qt::black;
+    pageShadow.setAlpha(18);
+
+    for (int ix = 0; ix < pagesX; ++ix) {
+        for (int iy = 0; iy < pagesY; ++iy) {
+            const QRectF pageRect(originX * sheetWidth + ix * sheetWidth,
+                                  originY * sheetHeight + iy * sheetHeight,
+                                  sheetWidth, sheetHeight);
+            if (!pageRect.intersects(rect))
+                continue;
+
+            // Soft drop shadow.
+            painter->fillRect(pageRect.adjusted(3, 3, 3, 3), pageShadow);
+            // Page body.
+            painter->fillRect(pageRect, pageColor);
+            // Border.
+            painter->setPen(QPen(pageBorder, 1));
+            painter->drawRect(pageRect);
+
+            // Page number label, top-left inside the sheet.
+            painter->setPen(palette().color(QPalette::WindowText));
+            QFont font = painter->font();
+            font.setPointSizeF(8.0);
+            painter->setFont(font);
+            painter->drawText(pageRect.adjusted(6, 4, -6, -4), Qt::AlignTop | Qt::AlignLeft,
+                             QStringLiteral("%1").arg(ix + iy * pagesX + 1));
+        }
+    }
+
+    // Grid dots inside the canvas only.
+    QColor dotColor = pageBorder;
+    dotColor.setAlpha(90);
     painter->setPen(QPen(dotColor, 0));
     painter->setBrush(dotColor);
 
-    const qreal left = std::floor(visible.left() / grid) * grid;
-    const qreal top = std::floor(visible.top() / grid) * grid;
-    for (qreal x = left; x <= visible.right(); x += grid)
-        for (qreal y = top; y <= visible.bottom(); y += grid)
-            painter->drawEllipse(QPointF(x, y), 1.1, 1.1);
+    const QRectF canvas = diagramScene->canvasRect();
+    const QRectF visible = canvas.intersected(rect.adjusted(-sheetWidth, -sheetHeight, sheetWidth,
+                                                            sheetHeight));
+    const qreal left = std::floor(visible.left() / DiagramScene::kGridSize) * DiagramScene::kGridSize;
+    const qreal top = std::floor(visible.top() / DiagramScene::kGridSize) * DiagramScene::kGridSize;
+    for (qreal x = left; x <= visible.right(); x += DiagramScene::kGridSize) {
+        for (qreal y = top; y <= visible.bottom(); y += DiagramScene::kGridSize) {
+            if (canvas.contains(QPointF(x, y)))
+                painter->drawEllipse(QPointF(x, y), 1.0, 1.0);
+        }
+    }
 }
 
 } // namespace bb
