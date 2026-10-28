@@ -26,6 +26,8 @@ private:
     void syncScenePreservingSelection();
     void updateStatusMessage();
 
+    bool m_initialCenter = true;
+
     void focusEntity(const Id &entityId);
     void addColumnToEntity(const Id &entityId);
     void removeTable(const Id &entityId);

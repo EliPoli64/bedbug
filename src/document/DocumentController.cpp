@@ -710,7 +710,6 @@ void DocumentController::removeSheetDown()
 void DocumentController::markDirty()
 {
     m_modified = true;
-    emit modelChanged();
 }
 
 } // namespace bb

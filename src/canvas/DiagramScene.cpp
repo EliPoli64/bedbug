@@ -195,6 +195,15 @@ QRectF DiagramScene::canvasRect() const
                   diagram->pagesX * kSheetWidth, diagram->pagesY * kSheetHeight);
 }
 
+QRectF DiagramScene::scrollableRect() const
+{
+    const QRectF canvas = canvasRect();
+    // A generous margin so the canvas can always be panned freely, even when the
+    // page grid is smaller than the viewport.
+    return canvas.adjusted(-kSheetWidth * 4, -kSheetHeight * 4, kSheetWidth * 4,
+                           kSheetHeight * 4);
+}
+
 int DiagramScene::pagesX() const
 {
     const Diagram *diagram = const_cast<DiagramScene *>(this)->findDiagram();
@@ -249,6 +258,7 @@ void DiagramScene::expandCanvasToFit(const QRectF &rect)
     if (changed) {
         if (m_markDirtyCallback)
             m_markDirtyCallback();
+        setSceneRect(scrollableRect());
         emit canvasChanged();
     }
 }
@@ -353,7 +363,7 @@ void DiagramScene::syncFromModel()
     // Grow the canvas to fit whatever was placed, then bound scrolling to it.
     for (EntityItem *item : std::as_const(m_items))
         expandCanvasToFit(item->mapToScene(item->boundingRect()).boundingRect());
-    setSceneRect(canvasRect());
+    setSceneRect(scrollableRect());
 }
 
 } // namespace bb

@@ -43,6 +43,7 @@ public:
 
     // Working-space ("sheet") grid for the active diagram.
     QRectF canvasRect() const;
+    QRectF scrollableRect() const;   // canvas plus a panning margin on every side
     int pagesX() const;
     int pagesY() const;
     int originX() const;

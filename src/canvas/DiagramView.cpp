@@ -26,6 +26,7 @@ DiagramView::DiagramView(QGraphicsScene *scene, QWidget *parent)
     setDragMode(QGraphicsView::RubberBandDrag);
     setTransformationAnchor(QGraphicsView::AnchorUnderMouse);
     setResizeAnchor(QGraphicsView::AnchorViewCenter);
+    setAlignment(Qt::AlignLeft | Qt::AlignTop);   // never pin the page to the centre
     setRenderHints(QPainter::Antialiasing | QPainter::TextAntialiasing);
     setBackgroundBrush(Qt::transparent);
     setViewportUpdateMode(QGraphicsView::BoundingRectViewportUpdate);

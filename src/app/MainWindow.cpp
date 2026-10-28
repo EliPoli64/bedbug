@@ -87,8 +87,13 @@ MainWindow::MainWindow(QWidget *parent)
     connect(m_scene, &DiagramScene::canvasContextMenuRequested, this,
             &MainWindow::showCanvasContextMenu);
     connect(m_scene, &DiagramScene::canvasChanged, this, [this] {
-        m_view->setSceneRect(m_scene->canvasRect());
+        m_view->setSceneRect(m_scene->scrollableRect());
         updateStatusMessage();
+        updateWindowTitle();
+    });
+    m_scene->setMarkDirtyCallback([this] {
+        m_document->markDirty();
+        updateWindowTitle();
     });
     createActions();
     createDock();
@@ -319,6 +324,10 @@ void MainWindow::syncScenePreservingSelection()
     if (!keep.isNull()) {
         if (EntityItem *item = m_scene->itemForEntity(keep))
             item->setSelected(true);
+    }
+    if (m_initialCenter) {
+        m_view->centerOn(m_scene->canvasRect().center());
+        m_initialCenter = false;
     }
     updateStatusMessage();
 }
