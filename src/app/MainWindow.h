@@ -27,6 +27,7 @@ private:
     void updateStatusMessage();
 
     bool m_initialCenter = true;
+    bool m_addingTable = false;
 
     void focusEntity(const Id &entityId);
     void addColumnToEntity(const Id &entityId);

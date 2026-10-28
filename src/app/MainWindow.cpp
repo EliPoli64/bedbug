@@ -167,8 +167,12 @@ void MainWindow::createActions()
                 return;
             }
         }
+        m_addingTable = true;
         Entity *entity = m_document->addEntity(trimmed);
-        m_pendingSelect = entity ? entity->id : Id();
+        if (entity)
+            m_pendingSelect = entity->id;
+        else
+            m_addingTable = false;
     });
 
     // Relationship tools (MySQL Workbench style): 1:1, 1:N, N:M. One is active at a time.
@@ -317,7 +321,18 @@ void MainWindow::createDock()
 
 void MainWindow::syncScenePreservingSelection()
 {
-    const Id keep = !m_pendingSelect.isNull() ? m_pendingSelect : selectedEntityId(m_scene);
+    m_scene->setActiveDiagramId(m_document->activeDiagramId());
+
+    Id keep;
+    if (m_addingTable) {
+        if (!m_document->model()->entities.isEmpty())
+            keep = m_document->model()->entities.last().id;
+        m_addingTable = false;
+    } else if (!m_pendingSelect.isNull()) {
+        keep = m_pendingSelect;
+    } else {
+        keep = selectedEntityId(m_scene);
+    }
     m_pendingSelect = Id();
 
     m_scene->syncFromModel();
