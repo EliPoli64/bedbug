@@ -228,6 +228,32 @@ int DiagramScene::originY() const
     return diagram ? diagram->originY : 0;
 }
 
+QPointF DiagramScene::freeTablePosition(const QPointF &preferredCenter, const QSizeF &size,
+                                        const Id &exclude) const
+{
+    QPointF pos = preferredCenter - QPointF(size.width() / 2.0, size.height() / 2.0);
+
+    // Slide down-right in small steps until the new table has clear space.
+    constexpr qreal step = 24.0;
+    constexpr int maxAttempts = 12;
+    for (int attempt = 0; attempt < maxAttempts; ++attempt) {
+        const QRectF candidate(pos, size);
+        bool overlaps = false;
+        for (EntityItem *other : m_items) {
+            if (other->entityId() == exclude)
+                continue;
+            if (candidate.intersects(other->sceneBoundingRect())) {
+                overlaps = true;
+                break;
+            }
+        }
+        if (!overlaps)
+            return pos;
+        pos += QPointF(step, step);
+    }
+    return pos;
+}
+
 void DiagramScene::expandCanvasToFit(const QRectF &rect)
 {
     if (!m_autoGrowCanvas)

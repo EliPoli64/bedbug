@@ -37,6 +37,7 @@ private:
     void focusEntity(const Id &entityId);
     void addColumnToEntity(const Id &entityId);
     void removeTable(const Id &entityId);
+    void placeNewTableAtViewCenter(const Id &entityId);
     void showTableContextMenu(const Id &entityId, const QPoint &globalPos);
     void showCanvasContextMenu(const QPoint &globalPos);
 

@@ -192,10 +192,13 @@ void MainWindow::createActions()
         }
         m_addingTable = true;
         Entity *entity = m_document->addEntity(trimmed);
-        if (entity)
-            m_pendingSelect = entity->id;
-        else
+        if (entity) {
+            const Id newId = entity->id;
+            m_pendingSelect = newId;
+            placeNewTableAtViewCenter(newId);
+        } else {
             m_addingTable = false;
+        }
     });
 
     // Relationship tools (MySQL Workbench style): 1:1, 1:N, N:M. One is active at a time.
@@ -360,6 +363,18 @@ void MainWindow::showCanvasContextMenu(const QPoint &globalPos)
     QMenu menu(this);
     menu.addAction(m_canvasSizeAction);
     menu.exec(globalPos);
+}
+
+void MainWindow::placeNewTableAtViewCenter(const Id &entityId)
+{
+    EntityItem *item = m_scene->itemForEntity(entityId);
+    if (!item)
+        return;
+
+    // Use the currently visible canvas centre rather than a fixed default slot.
+    const QPointF center = m_view->mapToScene(m_view->viewport()->rect().center());
+    const QSizeF size = item->sceneBoundingRect().size();
+    item->setPos(m_scene->freeTablePosition(center, size, entityId));
 }
 
 void MainWindow::debugAddTable(const QString &name)

@@ -122,6 +122,7 @@ private slots:
     void relationshipItem_cardinalityDerivedFromUniqueness();
     void contextMenu_onTableEmitsRequest();
     void canvasRect_defaultA4();
+    void freeTablePosition_centersAndAvoidsOverlap();
     void expandCanvasToFit_grows();
     void autoGrow_onMove();
     void canvasContextMenu_onEmptySpace();
@@ -566,6 +567,39 @@ void CanvasTest::canvasRect_defaultA4()
     QCOMPARE(scene.originY(), 0);
 
     delete model;
+}
+
+void CanvasTest::freeTablePosition_centersAndAvoidsOverlap()
+{
+    Model model = twoEntitySceneModel();
+    DiagramScene scene;
+    scene.setModel(&model);
+    scene.setActiveDiagramId(model.diagrams.first().id);
+    scene.syncFromModel();
+
+    const QSizeF size(200, 80);
+
+    // Empty area: the table is centred exactly on the requested point.
+    const QPointF center(900, 500);
+    QCOMPARE(scene.freeTablePosition(center, size), center - QPointF(100, 40));
+
+    // Asked to appear on top of an existing table: slide clear of every table.
+    EntityItem *customer = scene.itemForEntity(model.entities.at(0).id);
+    QVERIFY(customer);
+    const QPointF overlapPos =
+        scene.freeTablePosition(customer->sceneBoundingRect().center(), size);
+    QVERIFY(overlapPos != customer->sceneBoundingRect().center() - QPointF(100, 40));
+
+    const QRectF candidate(overlapPos, size);
+    for (const Entity &entity : model.entities) {
+        if (EntityItem *item = scene.itemForEntity(entity.id))
+            QVERIFY2(!candidate.intersects(item->sceneBoundingRect()), qPrintable(entity.name));
+    }
+
+    // The item being placed may sit on its own old rectangle (excluded from checks).
+    const QPointF ownPos = scene.freeTablePosition(customer->sceneBoundingRect().center(), size,
+                                                   customer->entityId());
+    QVERIFY(QRectF(ownPos, size).intersects(customer->sceneBoundingRect()));
 }
 
 void CanvasTest::expandCanvasToFit_grows()

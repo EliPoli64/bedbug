@@ -53,6 +53,12 @@ public:
     // overflowing direction). Marks the document dirty via the callback.
     void expandCanvasToFit(const QRectF &rect);
 
+    // Top-left for a new table of `size` centred on `preferredCenter` (scene
+    // coordinates), nudged diagonally while it would overlap another table.
+    // `exclude` skips the item being placed.
+    QPointF freeTablePosition(const QPointF &preferredCenter, const QSizeF &size,
+                              const Id &exclude = Id()) const;
+
     bool snapToGrid() const { return m_snapToGrid; }
     void setSnapToGrid(bool enabled) { m_snapToGrid = enabled; }
 
