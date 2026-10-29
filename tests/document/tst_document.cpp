@@ -48,6 +48,7 @@ private slots:
     void sessionPersistence_doesNotTaintFileState();
     void sheetGrid_addsAndRemovesInAllDirections();
     void sheetGrid_removalGuarded();
+    void canvasSize_setsPages();
 };
 
 void DocumentControllerTest::addRelationship_linksTables()
@@ -509,6 +510,21 @@ void DocumentControllerTest::sheetGrid_removalGuarded()
     const int pagesYBefore = controller.activeDiagram()->pagesY;
     controller.removeSheetDown();   // the bottom sheet contains the entity -> blocked
     QCOMPARE(controller.activeDiagram()->pagesY, pagesYBefore);
+}
+
+void DocumentControllerTest::canvasSize_setsPages()
+{
+    DocumentController controller;
+    controller.setCanvasSize(4, 3);
+    QCOMPARE(controller.activeDiagram()->pagesX, 4);
+    QCOMPARE(controller.activeDiagram()->pagesY, 3);
+    QCOMPARE(controller.activeDiagram()->originX, 0);
+    QCOMPARE(controller.activeDiagram()->originY, 0);
+
+    // Clamps to at least 1.
+    controller.setCanvasSize(0, -5);
+    QCOMPARE(controller.activeDiagram()->pagesX, 1);
+    QCOMPARE(controller.activeDiagram()->pagesY, 1);
 }
 
 QTEST_APPLESS_MAIN(DocumentControllerTest)

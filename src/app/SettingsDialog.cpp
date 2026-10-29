@@ -31,9 +31,11 @@ SettingsDialog::SettingsDialog(DocumentController *controller, QWidget *parent)
     if (m_controller) {
         if (Diagram *diagram = m_controller->activeDiagram()) {
             m_pagesXSpin = new QSpinBox(this);
+            m_pagesXSpin->setObjectName(QStringLiteral("pagesXSpin"));
             m_pagesXSpin->setRange(1, 20);
             m_pagesXSpin->setValue(diagram->pagesX);
             m_pagesYSpin = new QSpinBox(this);
+            m_pagesYSpin->setObjectName(QStringLiteral("pagesYSpin"));
             m_pagesYSpin->setRange(1, 20);
             m_pagesYSpin->setValue(diagram->pagesY);
             form->addRow(QStringLiteral("Canvas pages (width)"), m_pagesXSpin);

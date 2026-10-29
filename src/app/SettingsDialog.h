@@ -2,7 +2,6 @@
 
 #include <QDialog>
 
-class DocumentController;
 class QSpinBox;
 class QLineEdit;
 class QLabel;
@@ -20,7 +19,6 @@ public:
     explicit SettingsDialog(DocumentController *controller = nullptr,
                            QWidget *parent = nullptr);
 
-protected:
     void accept() override;
 
 private:

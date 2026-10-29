@@ -1,6 +1,7 @@
 #include "ColumnEditorDialog.h"
 #include "DocumentController.h"
 #include "EntityEditorPanel.h"
+#include "SettingsDialog.h"
 
 #include <QAbstractButton>
 #include <QApplication>
@@ -10,6 +11,7 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
+#include <QSpinBox>
 #include <QTimer>
 #include <QtTest>
 
@@ -32,6 +34,7 @@ class EntityEditorTest : public QObject
 
 private slots:
     void panelReflectsModelChanges();
+    void settingsDialog_appliesCanvasSize();
     void addColumnViaButton_showsInList();
     void removeColumnViaButton_removesSelected();
     void primaryKeySelectsAutoIncrementAndUnique();
@@ -200,6 +203,25 @@ void EntityEditorTest::dialogRejectsEmptyName()
     ColumnEditorDialog dialog;
     dialog.findChild<QLineEdit *>(QStringLiteral("nameEdit"))->setText(QStringLiteral("   "));
     QVERIFY(!dialog.validationError({}).isEmpty());
+}
+
+void EntityEditorTest::settingsDialog_appliesCanvasSize()
+{
+    DocumentController controller;
+    SettingsDialog dialog(&controller);
+    dialog.show();
+    QVERIFY(QTest::qWaitForWindowExposed(&dialog));
+
+    auto *pagesX = dialog.findChild<QSpinBox *>(QStringLiteral("pagesXSpin"));
+    auto *pagesY = dialog.findChild<QSpinBox *>(QStringLiteral("pagesYSpin"));
+    QVERIFY(pagesX && pagesY);
+
+    pagesX->setValue(4);
+    pagesY->setValue(3);
+    dialog.accept();
+
+    QCOMPARE(controller.activeDiagram()->pagesX, 4);
+    QCOMPARE(controller.activeDiagram()->pagesY, 3);
 }
 
 QTEST_MAIN(EntityEditorTest)
