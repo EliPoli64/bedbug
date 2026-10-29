@@ -65,16 +65,26 @@ MainWindow::MainWindow(QWidget *parent)
         [this](const Id &childEntityId, const QList<Id> &childColumnIds,
                const Id &parentEntityId, const QList<Id> &parentColumnIds,
                RelationshipKind kind) -> bool {
+            bool created = false;
             if (kind == RelationshipKind::ManyToMany)
-                return m_document->createManyToMany(childEntityId, parentEntityId) != nullptr;
-
-            const Id childColumn =
-                childColumnIds.isEmpty() ? Id() : childColumnIds.first();
-            const Id parentColumn =
-                parentColumnIds.isEmpty() ? Id() : parentColumnIds.first();
-            return m_document->addRelationshipPick(kind, childEntityId, childColumn, parentEntityId,
-                                                   parentColumn)
-                   != nullptr;
+                created = m_document->createManyToMany(childEntityId, parentEntityId) != nullptr;
+            else {
+                const Id childColumn =
+                    childColumnIds.isEmpty() ? Id() : childColumnIds.first();
+                const Id parentColumn =
+                    parentColumnIds.isEmpty() ? Id() : parentColumnIds.first();
+                created = m_document->addRelationshipPick(kind, childEntityId, childColumn, parentEntityId,
+                                                          parentColumn)
+                          != nullptr;
+            }
+            // One-shot tool: disarm after a successful creation, MySQL Workbench style.
+            if (created) {
+                for (QAction *action : {m_oneToOneAction, m_oneToManyAction, m_manyToManyAction}) {
+                    if (action->isChecked())
+                        action->setChecked(false);
+                }
+            }
+            return created;
         });
     connect(m_document, &DocumentController::modelChanged, this, [this] {
         updateWindowTitle();
