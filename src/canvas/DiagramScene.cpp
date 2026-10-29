@@ -361,9 +361,7 @@ void DiagramScene::syncFromModel()
         addItem(item);
     }
 
-    // Grow the canvas to fit whatever was placed, then bound scrolling to it.
-    for (EntityItem *item : std::as_const(m_items))
-        expandCanvasToFit(item->mapToScene(item->boundingRect()).boundingRect());
+    // Bound scrolling to the (possibly sheet-expanded) canvas.
     setSceneRect(scrollableRect());
 }
 
