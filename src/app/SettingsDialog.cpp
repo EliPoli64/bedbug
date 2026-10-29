@@ -27,7 +27,7 @@ const QString kAutoPkKey = QStringLiteral("autoAddPrimaryKey");
 const QString kRestoreSessionKey = QStringLiteral("restoreSessionOnStartup");
 
 const QString kDefaultPkFormat = QStringLiteral("{table}ID");
-const QString kDefaultThemeId = QStringLiteral("DarkBlue");
+const QString kDefaultThemeId = QStringLiteral("SoftBlue");
 
 } // namespace
 
@@ -137,9 +137,10 @@ QWidget *SettingsDialog::createAppearanceTab()
     form->addRow(QStringLiteral("Theme"), m_themeCombo);
 
     auto *hint = new QLabel(
-        QStringLiteral("Dark themes are vendored from the "
-                       "<b>qt-dark-theme</b> project. The theme is applied when you "
-                       "press OK."),
+        QStringLiteral("The default <b>Soft Blue</b> theme is a calm dark palette with a "
+                       "muted accent. The <i>Dark&nbsp;Blue/Green/Maroon/Purple</i> "
+                       "themes are vendored from the qt-dark-theme project and are more "
+                       "saturated. The theme is applied when you press OK."),
         page);
     hint->setWordWrap(true);
     form->addRow(hint);
@@ -215,7 +216,7 @@ void SettingsDialog::accept()
     settings.setValue(kRestoreSessionKey, !m_disableSessionRestoreCheck->isChecked());
 
     const QString themeId = m_themeCombo->currentData().toString();
-    settings.setValue(QStringLiteral("theme"), themeId);
+    settings.setValue(QStringLiteral("appearanceTheme"), themeId);
     if (auto *app = qobject_cast<QApplication *>(QCoreApplication::instance()))
         applyTheme(app, themeId);
 

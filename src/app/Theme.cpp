@@ -23,8 +23,9 @@ namespace bb {
 
 namespace {
 
-const QString kThemeSetting = QStringLiteral("theme");
-const QString kDefaultTheme = QStringLiteral("DarkBlue");
+const QString kThemeSetting = QStringLiteral("appearanceTheme");
+const QString kSoftBlueTheme = QStringLiteral("SoftBlue");
+const QString kDefaultTheme = kSoftBlueTheme;
 
 QColor accentFor(const QString &themeId)
 {
@@ -35,6 +36,48 @@ QColor accentFor(const QString &themeId)
     if (themeId == QLatin1String("DarkPurple"))
         return QColor(121, 80, 245);
     return QColor(34, 34, 255);   // DarkBlue
+}
+
+// Calm, blue-tinted dark palette. The accent is a soft light blue, and text drawn on
+// top of it is dark ink so both letter/background pairs keep a strong contrast.
+QPalette softBluePalette()
+{
+    const QColor window(43, 49, 56);       // #2b3138
+    const QColor base(51, 59, 68);         // #333b44
+    const QColor alternate(60, 70, 80);    // #3c4650
+    const QColor text(232, 238, 245);      // #e8eef5
+    const QColor button(57, 66, 75);       // #39424b
+    const QColor softBlue(158, 199, 232);  // #9ec7e8
+    const QColor ink(27, 39, 51);          // #1b2733
+
+    QPalette palette;
+    palette.setColor(QPalette::Window, window);
+    palette.setColor(QPalette::WindowText, text);
+    palette.setColor(QPalette::Base, base);
+    palette.setColor(QPalette::AlternateBase, alternate);
+    palette.setColor(QPalette::ToolTipBase, base);
+    palette.setColor(QPalette::ToolTipText, text);
+    palette.setColor(QPalette::Text, text);
+    palette.setColor(QPalette::Button, button);
+    palette.setColor(QPalette::ButtonText, text);
+    palette.setColor(QPalette::BrightText, Qt::white);
+    palette.setColor(QPalette::Link, softBlue);
+    palette.setColor(QPalette::LinkVisited, softBlue.darker(115));
+    palette.setColor(QPalette::Highlight, softBlue);
+    palette.setColor(QPalette::HighlightedText, ink);
+    palette.setColor(QPalette::Mid, QColor(107, 120, 133));     // borders
+    palette.setColor(QPalette::Midlight, QColor(85, 96, 107));
+    palette.setColor(QPalette::Dark, QColor(35, 41, 48));
+    palette.setColor(QPalette::Light, QColor(74, 85, 97));
+    palette.setColor(QPalette::Shadow, QColor(27, 32, 38));
+    palette.setColor(QPalette::PlaceholderText, QColor(154, 167, 180));
+
+    palette.setColor(QPalette::Disabled, QPalette::Text, QColor(127, 139, 150));
+    palette.setColor(QPalette::Disabled, QPalette::WindowText, QColor(127, 139, 150));
+    palette.setColor(QPalette::Disabled, QPalette::ButtonText, QColor(127, 139, 150));
+    palette.setColor(QPalette::Disabled, QPalette::Highlight, QColor(88, 99, 110));
+    palette.setColor(QPalette::Disabled, QPalette::HighlightedText, QColor(201, 211, 220));
+    return palette;
 }
 
 QPalette darkPalette(const QColor &accent)
@@ -73,12 +116,14 @@ QPalette darkPalette(const QColor &accent)
 
 QStringList availableThemeIds()
 {
-    return {QString(), QStringLiteral("DarkBlue"), QStringLiteral("DarkGreen"),
+    return {kSoftBlueTheme, QString(), QStringLiteral("DarkBlue"), QStringLiteral("DarkGreen"),
             QStringLiteral("DarkMaroon"), QStringLiteral("DarkPurple")};
 }
 
 QString themeDisplayName(const QString &themeId)
 {
+    if (themeId == kSoftBlueTheme)
+        return QStringLiteral("Soft Blue (default)");
     if (themeId.isEmpty())
         return QStringLiteral("System (light)");
     if (themeId == QLatin1String("DarkBlue"))
@@ -109,6 +154,13 @@ void applyTheme(QApplication *app, const QString &themeId)
     if (themeId.isEmpty()) {
         app->setStyleSheet(QString());
         app->setPalette(app->style()->standardPalette());
+        return;
+    }
+
+    if (themeId == kSoftBlueTheme) {
+        // Palette-only: standard Fusion indicators, calm colours, no saturated accents.
+        app->setStyleSheet(QString());
+        app->setPalette(softBluePalette());
         return;
     }
 

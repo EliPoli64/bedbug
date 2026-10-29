@@ -7,12 +7,12 @@ class QApplication;
 
 namespace bb {
 
-// Dark themes vendored from github.com/keshav-sahu7/qt-dark-theme.
-// The empty string means "system default" (no stylesheet, native light palette).
+// Dark themes vendored from github.com/keshav-sahu7/qt-dark-theme, plus the built-in
+// calm "Soft Blue" default. The empty string means "system default" (native palette).
 QStringList availableThemeIds();
 QString themeDisplayName(const QString &themeId);
 
-// Reads the persisted theme id (QSettings key "theme", default "DarkBlue").
+// Reads the persisted theme id (QSettings key "appearanceTheme", default "SoftBlue").
 QString currentThemeId();
 
 // Applies the given theme: installs the theme stylesheet and a matching palette.

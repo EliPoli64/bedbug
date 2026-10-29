@@ -2,20 +2,27 @@
 #include "DocumentController.h"
 #include "EntityEditorPanel.h"
 #include "SettingsDialog.h"
+#include "Theme.h"
 
 #include <QAbstractButton>
 #include <QApplication>
 #include <QCheckBox>
+#include <QColor>
 #include <QComboBox>
 #include <QFile>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
+#include <QPalette>
 #include <QPushButton>
+#include <QSettings>
 #include <QSpinBox>
 #include <QTabWidget>
 #include <QTimer>
 #include <QtTest>
+
+#include <algorithm>
+#include <cmath>
 
 using namespace bb;
 
@@ -26,6 +33,24 @@ CanonicalType bigintType()
     CanonicalType t;
     t.kind = CanonicalType::Kind::BigInt;
     return t;
+}
+
+// WCAG relative luminance and contrast ratio.
+qreal luminance(const QColor &color)
+{
+    auto channel = [](qreal value) {
+        value /= 255.0;
+        return value <= 0.03928 ? value / 12.92 : std::pow((value + 0.055) / 1.055, 2.4);
+    };
+    return 0.2126 * channel(color.red()) + 0.7152 * channel(color.green())
+           + 0.0722 * channel(color.blue());
+}
+
+qreal contrastRatio(const QColor &a, const QColor &b)
+{
+    const qreal la = luminance(a);
+    const qreal lb = luminance(b);
+    return (std::max(la, lb) + 0.05) / (std::min(la, lb) + 0.05);
 }
 
 } // namespace
@@ -39,6 +64,7 @@ private slots:
     void settingsDialog_appliesCanvasSize();
     void settingsDialog_hasTabsAndThemes();
     void themeResources_areEmbedded();
+    void softBlueTheme_hasReadableContrast();
     void addColumnViaButton_showsInList();
     void removeColumnViaButton_removesSelected();
     void primaryKeySelectsAutoIncrementAndUnique();
@@ -230,6 +256,8 @@ void EntityEditorTest::settingsDialog_appliesCanvasSize()
 
 void EntityEditorTest::settingsDialog_hasTabsAndThemes()
 {
+    QSettings().remove(QStringLiteral("appearanceTheme"));
+
     DocumentController controller;
     SettingsDialog dialog(&controller);
 
@@ -243,8 +271,10 @@ void EntityEditorTest::settingsDialog_hasTabsAndThemes()
 
     auto *theme = dialog.findChild<QComboBox *>(QStringLiteral("themeCombo"));
     QVERIFY(theme);
-    QCOMPARE(theme->count(), 5);   // system + four dark flavours
+    QCOMPARE(theme->count(), 6);   // soft blue + system + four dark flavours
+    QVERIFY(theme->findData(QStringLiteral("SoftBlue")) >= 0);
     QVERIFY(theme->findData(QStringLiteral("DarkPurple")) >= 0);
+    QCOMPARE(theme->currentData().toString(), QStringLiteral("SoftBlue"));
 
     QVERIFY(dialog.findChild<QCheckBox *>(QStringLiteral("disableAutoPkCheck")));
     QVERIFY(dialog.findChild<QCheckBox *>(QStringLiteral("autoGrowCheck")));
@@ -258,6 +288,24 @@ void EntityEditorTest::themeResources_areEmbedded()
         QVERIFY2(qss.exists(), qPrintable(name));
     }
     QVERIFY(QFile::exists(QStringLiteral(":/icons/blue/checkbox_checked.png")));
+}
+
+void EntityEditorTest::softBlueTheme_hasReadableContrast()
+{
+    auto *app = qobject_cast<QApplication *>(QCoreApplication::instance());
+    QVERIFY(app);
+
+    applyTheme(app, QStringLiteral("SoftBlue"));
+    const QPalette palette = app->palette();
+
+    QVERIFY(contrastRatio(palette.color(QPalette::WindowText),
+                          palette.color(QPalette::Window)) >= 7.0);
+    QVERIFY(contrastRatio(palette.color(QPalette::Text),
+                          palette.color(QPalette::Base)) >= 7.0);
+    QVERIFY(contrastRatio(palette.color(QPalette::ButtonText),
+                          palette.color(QPalette::Button)) >= 7.0);
+    QVERIFY(contrastRatio(palette.color(QPalette::HighlightedText),
+                          palette.color(QPalette::Highlight)) >= 4.5);
 }
 
 QTEST_MAIN(EntityEditorTest)

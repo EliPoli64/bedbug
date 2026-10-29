@@ -130,7 +130,7 @@ void EntityItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option
 
     const QFontMetricsF metrics = painter->fontMetrics();
     QColor mutedColor = palette.color(QPalette::WindowText);
-    mutedColor.setAlpha(150);
+    mutedColor.setAlpha(170);
 
     qreal y = kHeaderHeight;
     for (int i = 0; i < m_entity->columns.size(); ++i) {
@@ -152,7 +152,7 @@ void EntityItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option
             painter->setPen(Qt::NoPen);
             painter->setBrush(palette.color(QPalette::Highlight).lighter(118));
             painter->drawRoundedRect(chipRect, 3.0, 3.0);
-            painter->setPen(palette.color(QPalette::WindowText));
+            painter->setPen(palette.color(QPalette::HighlightedText));
             painter->drawText(chipRect, Qt::AlignCenter, QStringLiteral("PK"));
         } else if (column.unique) {
             // Outlined chip.
