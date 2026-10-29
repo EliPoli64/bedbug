@@ -126,6 +126,16 @@ MainWindow::MainWindow(QWidget *parent)
     updateStatusMessage();
 }
 
+MainWindow::~MainWindow()
+{
+    // Disconnect signal handlers before teardown so they don't fire (and touch
+    // half-destroyed widgets) while the scene/document are being destroyed.
+    if (m_scene)
+        disconnect(m_scene, nullptr, this, nullptr);
+    if (m_document)
+        disconnect(m_document, nullptr, this, nullptr);
+}
+
 void MainWindow::createActions()
 {
     m_newAction = new QAction(tr("&New"), this);
@@ -375,6 +385,13 @@ void MainWindow::showCanvasContextMenu(const QPoint &globalPos)
     menu.addSeparator();
     menu.addAction(m_removeSheetAction);
     menu.exec(globalPos);
+}
+
+void MainWindow::debugAddTable(const QString &name)
+{
+    Entity *entity = m_document->addEntity(name);
+    if (entity)
+        m_pendingSelect = entity->id;
 }
 
 void MainWindow::updateStatusMessage()

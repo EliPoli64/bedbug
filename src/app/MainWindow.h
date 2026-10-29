@@ -17,6 +17,10 @@ class MainWindow : public QMainWindow
 
 public:
     explicit MainWindow(QWidget *parent = nullptr);
+    ~MainWindow() override;
+
+    // Debug/test hook.
+    void debugAddTable(const QString &name = QStringLiteral("table2"));
 
 private:
     void createActions();
