@@ -147,21 +147,24 @@ Entity *DocumentController::addEntity(const QString &name)
     entity.name = trimmed;
 
     // Spawn with a primary key by default. The name format is configurable via
-    // QSettings ("defaultPkFormat", default "{table}ID", {table} lowercased).
-    const QString format = QSettings().value(QStringLiteral("defaultPkFormat"),
-                                             QStringLiteral("{table}ID")).toString();
-    QString pkName = format.isEmpty() ? QStringLiteral("{table}ID") : format;
-    pkName.replace(QStringLiteral("{table}"), trimmed.toLower());
+    // QSettings ("defaultPkFormat", default "{table}ID", {table} lowercased) and the
+    // whole behaviour can be turned off in Settings → Deactivation.
+    if (QSettings().value(QStringLiteral("autoAddPrimaryKey"), true).toBool()) {
+        const QString format = QSettings().value(QStringLiteral("defaultPkFormat"),
+                                                 QStringLiteral("{table}ID")).toString();
+        QString pkName = format.isEmpty() ? QStringLiteral("{table}ID") : format;
+        pkName.replace(QStringLiteral("{table}"), trimmed.toLower());
 
-    Column primaryKey;
-    primaryKey.id = Id::create();
-    primaryKey.name = pkName;
-    primaryKey.type.kind = CanonicalType::Kind::BigInt;
-    primaryKey.nullable = false;
-    primaryKey.primaryKey = true;
-    primaryKey.unique = true;
-    primaryKey.autoIncrement = true;
-    entity.columns.append(primaryKey);
+        Column primaryKey;
+        primaryKey.id = Id::create();
+        primaryKey.name = pkName;
+        primaryKey.type.kind = CanonicalType::Kind::BigInt;
+        primaryKey.nullable = false;
+        primaryKey.primaryKey = true;
+        primaryKey.unique = true;
+        primaryKey.autoIncrement = true;
+        entity.columns.append(primaryKey);
+    }
 
     m_model.entities.append(entity);
 

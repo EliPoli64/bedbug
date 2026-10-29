@@ -20,6 +20,7 @@
 #include <QMenu>
 #include <QMenuBar>
 #include <QMessageBox>
+#include <QSettings>
 #include <QShortcut>
 #include <QStandardPaths>
 #include <QStatusBar>
@@ -55,6 +56,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     m_scene->setModel(m_document->model());
     m_scene->setActiveDiagramId(m_document->activeDiagramId());
+    applyRuntimeSettings();
     connect(m_document, &DocumentController::modelChanged, this,
             &MainWindow::syncScenePreservingSelection);
     connect(m_scene, &DiagramScene::entityMoved, this, [this] { updateStatusMessage(); });
@@ -238,13 +240,16 @@ void MainWindow::createActions()
 
     m_snapAction = new QAction(tr("Snap to Grid"), this);
     m_snapAction->setCheckable(true);
-    m_snapAction->setChecked(false);   // free dragging by default
+    const bool snapDefault = QSettings().value(QStringLiteral("snapToGridDefault"), false).toBool();
+    m_snapAction->setChecked(snapDefault);
+    m_scene->setSnapToGrid(snapDefault);
     connect(m_snapAction, &QAction::toggled, m_scene, &DiagramScene::setSnapToGrid);
 
     m_canvasSizeAction = new QAction(tr("Canvas Size…"), this);
     connect(m_canvasSizeAction, &QAction::triggered, this, [this] {
-        bb::SettingsDialog dialog(m_document, this);
-        dialog.exec();
+        bb::SettingsDialog dialog(m_document, this, bb::SettingsDialog::CanvasTab);
+        if (dialog.exec() == QDialog::Accepted)
+            applyRuntimeSettings();
     });
 }
 
@@ -292,7 +297,8 @@ void MainWindow::createMenus()
     editMenu->addSeparator();
     editMenu->addAction(tr("Settings…"), this, [this] {
         bb::SettingsDialog dialog(m_document, this);
-        dialog.exec();
+        if (dialog.exec() == QDialog::Accepted)
+            applyRuntimeSettings();
     });
 
     QMenu *viewMenu = menuBar()->addMenu(tr("&View"));
@@ -517,6 +523,12 @@ void MainWindow::updateWindowTitle()
     setWindowModified(m_document->isModified());
 }
 
+void MainWindow::applyRuntimeSettings()
+{
+    QSettings settings;
+    m_scene->setAutoGrowCanvas(settings.value(QStringLiteral("autoGrowCanvas"), true).toBool());
+}
+
 QString MainWindow::sessionFilePath() const
 {
     const QString directory = QStandardPaths::writableLocation(QStandardPaths::AppDataLocation);
@@ -526,6 +538,9 @@ QString MainWindow::sessionFilePath() const
 
 void MainWindow::restoreSession()
 {
+    if (!QSettings().value(QStringLiteral("restoreSessionOnStartup"), true).toBool())
+        return;
+
     const QString path = sessionFilePath();
     if (!QFileInfo::exists(path))
         return;

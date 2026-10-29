@@ -7,11 +7,13 @@
 #include <QApplication>
 #include <QCheckBox>
 #include <QComboBox>
+#include <QFile>
 #include <QLineEdit>
 #include <QListWidget>
 #include <QMessageBox>
 #include <QPushButton>
 #include <QSpinBox>
+#include <QTabWidget>
 #include <QTimer>
 #include <QtTest>
 
@@ -35,6 +37,8 @@ class EntityEditorTest : public QObject
 private slots:
     void panelReflectsModelChanges();
     void settingsDialog_appliesCanvasSize();
+    void settingsDialog_hasTabsAndThemes();
+    void themeResources_areEmbedded();
     void addColumnViaButton_showsInList();
     void removeColumnViaButton_removesSelected();
     void primaryKeySelectsAutoIncrementAndUnique();
@@ -222,6 +226,38 @@ void EntityEditorTest::settingsDialog_appliesCanvasSize()
 
     QCOMPARE(controller.activeDiagram()->pagesX, 4);
     QCOMPARE(controller.activeDiagram()->pagesY, 3);
+}
+
+void EntityEditorTest::settingsDialog_hasTabsAndThemes()
+{
+    DocumentController controller;
+    SettingsDialog dialog(&controller);
+
+    auto *tabs = dialog.findChild<QTabWidget *>();
+    QVERIFY(tabs);
+    QCOMPARE(tabs->count(), 4);
+    QCOMPARE(tabs->tabText(0), QStringLiteral("General"));
+    QCOMPARE(tabs->tabText(1), QStringLiteral("Canvas"));
+    QCOMPARE(tabs->tabText(2), QStringLiteral("Appearance"));
+    QCOMPARE(tabs->tabText(3), QStringLiteral("Deactivation"));
+
+    auto *theme = dialog.findChild<QComboBox *>(QStringLiteral("themeCombo"));
+    QVERIFY(theme);
+    QCOMPARE(theme->count(), 5);   // system + four dark flavours
+    QVERIFY(theme->findData(QStringLiteral("DarkPurple")) >= 0);
+
+    QVERIFY(dialog.findChild<QCheckBox *>(QStringLiteral("disableAutoPkCheck")));
+    QVERIFY(dialog.findChild<QCheckBox *>(QStringLiteral("autoGrowCheck")));
+}
+
+void EntityEditorTest::themeResources_areEmbedded()
+{
+    for (const QString &name : {QStringLiteral("DarkBlue"), QStringLiteral("DarkGreen"),
+                                QStringLiteral("DarkMaroon"), QStringLiteral("DarkPurple")}) {
+        QFile qss(QStringLiteral(":/%1.qss").arg(name));
+        QVERIFY2(qss.exists(), qPrintable(name));
+    }
+    QVERIFY(QFile::exists(QStringLiteral(":/icons/blue/checkbox_checked.png")));
 }
 
 QTEST_MAIN(EntityEditorTest)

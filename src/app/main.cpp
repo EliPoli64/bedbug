@@ -1,4 +1,5 @@
 #include "MainWindow.h"
+#include "Theme.h"
 
 #include <QApplication>
 #include <QFont>
@@ -38,6 +39,10 @@ int main(int argc, char *argv[])
     app.setApplicationName(QStringLiteral("bedbug"));
     app.setApplicationVersion(QStringLiteral("0.0.1"));
     app.setOrganizationName(QStringLiteral("bedbug"));
+
+    // Dark by default; the theme is selectable in Settings → Appearance.
+    applyCurrentTheme(&app);
+
     app.setWindowIcon(bedbugIcon());
 
     MainWindow window;

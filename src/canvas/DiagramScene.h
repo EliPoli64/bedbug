@@ -56,6 +56,10 @@ public:
     bool snapToGrid() const { return m_snapToGrid; }
     void setSnapToGrid(bool enabled) { m_snapToGrid = enabled; }
 
+    // When enabled (the default) dragging a table past the sheet edge adds pages.
+    bool autoGrowCanvas() const { return m_autoGrowCanvas; }
+    void setAutoGrowCanvas(bool enabled) { m_autoGrowCanvas = enabled; }
+
     // Relationship tools (MySQL Workbench style): selecting a tool arms link mode for
     // relationship creation; std::nullopt disarms it. Esc cancels.
     void setLinkTool(std::optional<RelationshipKind> tool);
@@ -105,6 +109,7 @@ private:
     QHash<Id, EntityItem *> m_items;
     QHash<Id, RelationshipItem *> m_relationshipItems;
     bool m_snapToGrid = false;   // Workbench-like free dragging by default
+    bool m_autoGrowCanvas = true;
 
     std::optional<RelationshipKind> m_linkTool;
     bool m_pointedLines = false;

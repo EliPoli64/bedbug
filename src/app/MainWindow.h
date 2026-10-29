@@ -29,6 +29,7 @@ private:
     void createDock();
     void syncScenePreservingSelection();
     void updateStatusMessage();
+    void applyRuntimeSettings();
 
     bool m_initialCenter = true;
     bool m_addingTable = false;

@@ -230,6 +230,9 @@ int DiagramScene::originY() const
 
 void DiagramScene::expandCanvasToFit(const QRectF &rect)
 {
+    if (!m_autoGrowCanvas)
+        return;
+
     Diagram *diagram = findDiagram();
     if (!diagram)
         return;

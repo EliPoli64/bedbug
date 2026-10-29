@@ -1,5 +1,6 @@
 #include "DocumentController.h"
 
+#include <QSettings>
 #include <QTemporaryDir>
 #include <QtTest>
 
@@ -44,6 +45,7 @@ private slots:
     void addRelationshipPick_autoCreatesColumn();
     void addRelationshipPick_reusesExistingColumn();
     void duplicateTableNamesRejected();
+    void addEntity_respectsAutoPkSetting();
     void saveLoad_roundTripsDocumentAndDirtyState();
     void sessionPersistence_doesNotTaintFileState();
     void sheetGrid_addsAndRemovesInAllDirections();
@@ -379,6 +381,30 @@ void DocumentControllerTest::duplicateTableNamesRejected()
     QVERIFY(controller.renameEntity(ordersId, QStringLiteral("orders")));
     QVERIFY(controller.renameEntity(ordersId, QStringLiteral("order_items")));
     QCOMPARE(controller.model()->findEntity(ordersId)->name, QStringLiteral("order_items"));
+}
+
+void DocumentControllerTest::addEntity_respectsAutoPkSetting()
+{
+    QSettings settings;
+    settings.setValue(QStringLiteral("autoAddPrimaryKey"), false);
+
+    {
+        DocumentController controller;
+        Entity *entity = controller.addEntity(QStringLiteral("customer"));
+        QVERIFY(entity);
+        QCOMPARE(entity->columns.size(), 0);
+    }
+
+    settings.setValue(QStringLiteral("autoAddPrimaryKey"), true);
+    {
+        DocumentController controller;
+        Entity *entity = controller.addEntity(QStringLiteral("customer"));
+        QVERIFY(entity);
+        QCOMPARE(entity->columns.size(), 1);
+        QVERIFY(entity->columns.first().primaryKey);
+    }
+
+    settings.remove(QStringLiteral("autoAddPrimaryKey"));
 }
 
 void DocumentControllerTest::saveLoad_roundTripsDocumentAndDirtyState()

@@ -196,8 +196,9 @@ void DiagramView::panBy(const QPoint &delta)
 
 void DiagramView::drawBackground(QPainter *painter, const QRectF &rect)
 {
-    // Workspace background (grey), with white A4 sheets laid out on a grid.
-    painter->fillRect(rect, QColor(232, 232, 232));
+    // Workspace background (theme-adaptive), with A4 sheets laid out on a grid.
+    const QColor workspace = palette().color(QPalette::Window);
+    painter->fillRect(rect, workspace);
 
     auto *diagramScene = dynamic_cast<DiagramScene *>(scene());
     if (!diagramScene)
@@ -210,7 +211,11 @@ void DiagramView::drawBackground(QPainter *painter, const QRectF &rect)
     const qreal sheetWidth = DiagramScene::kSheetWidth;
     const qreal sheetHeight = DiagramScene::kSheetHeight;
 
-    const QColor pageColor = palette().color(QPalette::Base);
+    // A stylesheet can flatten QPalette::Base onto the window colour; make sure the
+    // page still stands out from the workspace in that case.
+    QColor pageColor = palette().color(QPalette::Base);
+    if (qAbs(pageColor.lightness() - workspace.lightness()) < 8)
+        pageColor = workspace.lightness() > 127 ? QColor(Qt::white) : workspace.lighter(118);
     const QColor pageBorder = palette().color(QPalette::Mid);
     QColor pageShadow = Qt::black;
     pageShadow.setAlpha(18);
