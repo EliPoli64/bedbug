@@ -2,19 +2,23 @@
 
 #include <QDialog>
 
+class DocumentController;
+class QSpinBox;
 class QLineEdit;
 class QLabel;
 
 namespace bb {
 
-// Preferences for bedbug. Currently exposes the primary-key column name format
-// (default "{table}ID", {table} replaced with the lowercased table name).
+class DocumentController;
+
+// Preferences for bedbug: primary-key column name format and canvas (sheet) size.
 class SettingsDialog : public QDialog
 {
     Q_OBJECT
 
 public:
-    explicit SettingsDialog(QWidget *parent = nullptr);
+    explicit SettingsDialog(DocumentController *controller = nullptr,
+                           QWidget *parent = nullptr);
 
 protected:
     void accept() override;
@@ -22,8 +26,13 @@ protected:
 private:
     void updatePreview();
 
+    DocumentController *m_controller = nullptr;
+
     QLineEdit *m_formatEdit = nullptr;
     QLabel *m_previewLabel = nullptr;
+
+    QSpinBox *m_pagesXSpin = nullptr;
+    QSpinBox *m_pagesYSpin = nullptr;
 };
 
 } // namespace bb

@@ -610,6 +610,17 @@ void DocumentController::newDocument()
     emit modelChanged();
 }
 
+void DocumentController::setCanvasSize(int pagesX, int pagesY)
+{
+    if (Diagram *diagram = activeDiagram()) {
+        diagram->pagesX = qMax(1, pagesX);
+        diagram->pagesY = qMax(1, pagesY);
+        diagram->originX = 0;
+        diagram->originY = 0;
+        markModifiedAndNotify();
+    }
+}
+
 namespace {
 
 bool sheetHasNodes(const Diagram &diagram, int sheetX, int sheetY, qreal sheetWidth,

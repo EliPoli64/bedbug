@@ -1,16 +1,20 @@
 #include "SettingsDialog.h"
 
+#include "DocumentController.h"
+
 #include <QDialogButtonBox>
 #include <QFormLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QSettings>
+#include <QSpinBox>
 #include <QVBoxLayout>
 
 namespace bb {
 
-SettingsDialog::SettingsDialog(QWidget *parent)
+SettingsDialog::SettingsDialog(DocumentController *controller, QWidget *parent)
     : QDialog(parent)
+    , m_controller(controller)
 {
     setWindowTitle(QStringLiteral("Settings"));
 
@@ -23,6 +27,19 @@ SettingsDialog::SettingsDialog(QWidget *parent)
     auto *form = new QFormLayout;
     form->addRow(QStringLiteral("Primary key name format"), m_formatEdit);
     form->addRow(QStringLiteral("Preview (table \"customer\")"), m_previewLabel);
+
+    if (m_controller) {
+        if (Diagram *diagram = m_controller->activeDiagram()) {
+            m_pagesXSpin = new QSpinBox(this);
+            m_pagesXSpin->setRange(1, 20);
+            m_pagesXSpin->setValue(diagram->pagesX);
+            m_pagesYSpin = new QSpinBox(this);
+            m_pagesYSpin->setRange(1, 20);
+            m_pagesYSpin->setValue(diagram->pagesY);
+            form->addRow(QStringLiteral("Canvas pages (width)"), m_pagesXSpin);
+            form->addRow(QStringLiteral("Canvas pages (height)"), m_pagesYSpin);
+        }
+    }
 
     auto *buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel, this);
     connect(buttons, &QDialogButtonBox::accepted, this, &QDialog::accept);
@@ -49,6 +66,10 @@ void SettingsDialog::accept()
     const QString format = m_formatEdit->text().trimmed();
     QSettings().setValue(QStringLiteral("defaultPkFormat"),
                         format.isEmpty() ? QStringLiteral("{table}ID") : format);
+
+    if (m_controller && m_pagesXSpin && m_pagesYSpin)
+        m_controller->setCanvasSize(m_pagesXSpin->value(), m_pagesYSpin->value());
+
     QDialog::accept();
 }
 

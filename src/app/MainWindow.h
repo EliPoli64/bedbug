@@ -71,11 +71,7 @@ protected:
     QAction *m_zoomOutAction = nullptr;
     QAction *m_fitAction = nullptr;
     QAction *m_snapAction = nullptr;
-    QAction *m_addSheetLeftAction = nullptr;
-    QAction *m_addSheetRightAction = nullptr;
-    QAction *m_addSheetUpAction = nullptr;
-    QAction *m_addSheetDownAction = nullptr;
-    QAction *m_removeSheetAction = nullptr;
+    QAction *m_canvasSizeAction = nullptr;
     Id m_pendingSelect;
 };
 

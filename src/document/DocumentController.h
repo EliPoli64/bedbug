@@ -42,6 +42,10 @@ public:
 
     // --- Working-space ("sheet") grid ---------------------------------------
 
+    // Sets the active diagram's page grid to the given size (origin reset to 0,0)
+    // and emits modelChanged().
+    void setCanvasSize(int pagesX, int pagesY);
+
     // Adds one A4 sheet to the active diagram in the given direction and emits
     // modelChanged().
     void addSheetLeft();

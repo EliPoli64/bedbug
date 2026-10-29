@@ -241,24 +241,10 @@ void MainWindow::createActions()
     m_snapAction->setChecked(false);   // free dragging by default
     connect(m_snapAction, &QAction::toggled, m_scene, &DiagramScene::setSnapToGrid);
 
-    m_addSheetLeftAction = new QAction(tr("Add Sheet Left"), this);
-    m_addSheetRightAction = new QAction(tr("Add Sheet Right"), this);
-    m_addSheetUpAction = new QAction(tr("Add Sheet Above"), this);
-    m_addSheetDownAction = new QAction(tr("Add Sheet Below"), this);
-    m_removeSheetAction = new QAction(tr("Remove Last Sheet"), this);
-    connect(m_addSheetLeftAction, &QAction::triggered, m_document, &DocumentController::addSheetLeft);
-    connect(m_addSheetRightAction, &QAction::triggered, m_document, &DocumentController::addSheetRight);
-    connect(m_addSheetUpAction, &QAction::triggered, m_document, &DocumentController::addSheetUp);
-    connect(m_addSheetDownAction, &QAction::triggered, m_document, &DocumentController::addSheetDown);
-    connect(m_removeSheetAction, &QAction::triggered, this, [this] {
-        if (m_scene->pagesX() > 1)
-            m_document->removeSheetRight();
-        else if (m_scene->pagesY() > 1)
-            m_document->removeSheetDown();
-        else if (m_scene->originX() < 0)
-            m_document->removeSheetLeft();
-        else if (m_scene->originY() < 0)
-            m_document->removeSheetUp();
+    m_canvasSizeAction = new QAction(tr("Canvas Size…"), this);
+    connect(m_canvasSizeAction, &QAction::triggered, this, [this] {
+        bb::SettingsDialog dialog(m_document, this);
+        dialog.exec();
     });
 }
 
@@ -281,12 +267,7 @@ void MainWindow::createToolBars()
     toolBar->addSeparator();
     toolBar->addAction(m_snapAction);
     toolBar->addSeparator();
-    toolBar->addAction(m_addSheetLeftAction);
-    toolBar->addAction(m_addSheetRightAction);
-    toolBar->addAction(m_addSheetUpAction);
-    toolBar->addAction(m_addSheetDownAction);
-    toolBar->addSeparator();
-    toolBar->addAction(m_removeSheetAction);
+    toolBar->addAction(m_canvasSizeAction);
 }
 
 void MainWindow::createMenus()
@@ -310,7 +291,7 @@ void MainWindow::createMenus()
     editMenu->addAction(m_pointedAction);
     editMenu->addSeparator();
     editMenu->addAction(tr("Settings…"), this, [this] {
-        bb::SettingsDialog dialog(this);
+        bb::SettingsDialog dialog(m_document, this);
         dialog.exec();
     });
 
@@ -321,13 +302,7 @@ void MainWindow::createMenus()
     viewMenu->addSeparator();
     viewMenu->addAction(m_snapAction);
     viewMenu->addSeparator();
-    QMenu *sheetsMenu = viewMenu->addMenu(tr("Sheets"));
-    sheetsMenu->addAction(m_addSheetLeftAction);
-    sheetsMenu->addAction(m_addSheetRightAction);
-    sheetsMenu->addAction(m_addSheetUpAction);
-    sheetsMenu->addAction(m_addSheetDownAction);
-    sheetsMenu->addSeparator();
-    sheetsMenu->addAction(m_removeSheetAction);
+    viewMenu->addAction(m_canvasSizeAction);
     if (auto *dock = qobject_cast<QDockWidget *>(m_entityPanel->parentWidget()))
         viewMenu->addAction(dock->toggleViewAction());
 }
@@ -377,13 +352,7 @@ void MainWindow::syncScenePreservingSelection()
 void MainWindow::showCanvasContextMenu(const QPoint &globalPos)
 {
     QMenu menu(this);
-    QMenu *addSheetMenu = menu.addMenu(tr("Add Sheet"));
-    addSheetMenu->addAction(m_addSheetLeftAction);
-    addSheetMenu->addAction(m_addSheetRightAction);
-    addSheetMenu->addAction(m_addSheetUpAction);
-    addSheetMenu->addAction(m_addSheetDownAction);
-    menu.addSeparator();
-    menu.addAction(m_removeSheetAction);
+    menu.addAction(m_canvasSizeAction);
     menu.exec(globalPos);
 }
 
