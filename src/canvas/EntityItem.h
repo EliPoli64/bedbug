@@ -38,7 +38,14 @@ public:
     // outside the body.
     int columnAt(const QPointF &itemPos) const;
 
-    // Scene-space port points on the requested edges, centered vertically in the row.
+    // Which table edge an edge attaches to. Left/right ports sit on the column's row;
+    // top/bottom ports sit at the table's horizontal centre.
+    enum class Side { Left, Right, Top, Bottom };
+
+    // Scene-space port point on the requested side.
+    QPointF portFor(const Id &columnId, Side side) const;
+
+    // Convenience wrappers for the two row ports.
     QPointF leftPortFor(const Id &columnId) const;
     QPointF rightPortFor(const Id &columnId) const;
 

@@ -119,6 +119,7 @@ private slots:
     void addEntityViaController_updatesScene();
     void paint_rendersEntityWithoutError();
     void relationshipItem_rendersAndRefreshesOnMove();
+    void relationship_attachesToFacingSides();
     void relationshipItem_skipped_whenEntityNotOnDiagram();
     void linkMode_clicksCreateRelationship();
     void linkTool_oneToOneFlowsThrough();
@@ -242,6 +243,15 @@ void CanvasTest::ports_areOnRowCenters()
     QVERIFY(left.y() > EntityItem::kHeaderHeight);
     QVERIFY(right.x() > item->pos().x());
 
+    // Top and bottom ports sit at the middle of their edges.
+    const QPointF top = item->portFor(idColumn.id, EntityItem::Side::Top);
+    const QPointF bottom = item->portFor(idColumn.id, EntityItem::Side::Bottom);
+    const qreal tableHeight =
+        EntityItem::kHeaderHeight + customer.columns.size() * EntityItem::kRowHeight;
+    QCOMPARE(top.y(), item->pos().y());
+    QCOMPARE(bottom.y(), item->pos().y() + tableHeight);
+    QVERIFY(qFuzzyCompare(top.x(), item->pos().x() + item->contentWidth() / 2.0));
+
     // Unknown column yields a null point.
     QCOMPARE(item->leftPortFor(Id::create()), QPointF());
 
@@ -320,6 +330,50 @@ void CanvasTest::relationshipItem_rendersAndRefreshesOnMove()
     scene.itemForEntity(ordersId)->setPos(QPointF(700, 320));
     const QRectF after = item->boundingRect();
     QVERIFY(after != before);
+
+    delete model;
+}
+
+void CanvasTest::relationship_attachesToFacingSides()
+{
+    Model *model = new Model(twoEntityConnectedModel());
+    DiagramScene scene;
+    scene.setModel(model);
+    scene.setActiveDiagramId(model->diagrams.first().id);
+    scene.setSnapToGrid(false);
+    scene.syncFromModel();
+
+    const Entity &customer = model->entities.at(0);   // parent
+    const Entity &orders = model->entities.at(1);     // child
+    EntityItem *customerItem = scene.itemForEntity(customer.id);
+    EntityItem *ordersItem = scene.itemForEntity(orders.id);
+    RelationshipItem *edge = scene.itemForRelationship(model->relationships.first().id);
+    QVERIFY(customerItem);
+    QVERIFY(ordersItem);
+    QVERIFY(edge);
+
+    const Id customerPk = customer.columns.constFirst().id;
+    const Id ordersFk = orders.columns.at(1).id;
+
+    // Default layout: customer is left of orders, so the edge uses the facing sides.
+    QCOMPARE(edge->childAnchor(), ordersItem->portFor(ordersFk, EntityItem::Side::Left));
+    QCOMPARE(edge->parentAnchor(), customerItem->portFor(customerPk, EntityItem::Side::Right));
+
+    // Put orders below customer: the edge switches to top/bottom attachment.
+    ordersItem->setPos(customerItem->pos().x(),
+                       customerItem->pos().y() + customerItem->boundingRect().height() + 80.0);
+    QCOMPARE(edge->childAnchor(), ordersItem->portFor(ordersFk, EntityItem::Side::Top));
+    QCOMPARE(edge->parentAnchor(), customerItem->portFor(customerPk, EntityItem::Side::Bottom));
+
+    // The route uses a horizontal lane halfway between the two tables.
+    const qreal laneY = (edge->childAnchor().y() + edge->parentAnchor().y()) / 2.0;
+    const qreal laneX = (edge->childAnchor().x() + edge->parentAnchor().x()) / 2.0;
+    QVERIFY(edge->shape().contains(QPointF(laneX, laneY)));
+
+    // And back above: the anchors flip to the opposite top/bottom edges.
+    ordersItem->setPos(customerItem->pos().x(), customerItem->pos().y() - 300.0);
+    QCOMPARE(edge->childAnchor(), ordersItem->portFor(ordersFk, EntityItem::Side::Bottom));
+    QCOMPARE(edge->parentAnchor(), customerItem->portFor(customerPk, EntityItem::Side::Top));
 
     delete model;
 }

@@ -19,8 +19,25 @@ constexpr qreal kMinOverlapJog = 24.0;
 
 // Frees up an orthogonal polyline from s to e that clears the two entity boxes.
 QVector<QPointF> routeOrthogonal(const QPointF &s, const QPointF &e,
-                                 const QRectF &childBounds, const QRectF &parentBounds)
+                                 const QRectF &childBounds, const QRectF &parentBounds,
+                                 bool vertical)
 {
+    if (vertical) {
+        // Stacked boxes have a clear lane between them. When they overlap vertically,
+        // detour sideways instead so the line does not cut through a table.
+        const bool verticalGap = childBounds.bottom() < parentBounds.top()
+                                 || parentBounds.bottom() < childBounds.top();
+        if (verticalGap) {
+            const qreal midY = (s.y() + e.y()) / 2.0;
+            return {s, QPointF(s.x(), midY), QPointF(e.x(), midY), e};
+        }
+
+        const qreal left = qMin(childBounds.left(), parentBounds.left());
+        const qreal right = qMax(childBounds.right(), parentBounds.right());
+        const qreal midX = (left >= kDetourGap) ? left - kDetourGap : right + kDetourGap;
+        return {s, QPointF(midX, s.y()), QPointF(midX, e.y()), e};
+    }
+
     const bool parentRightOfChild = e.x() >= s.x();
     const qreal childInner = parentRightOfChild ? childBounds.right() : childBounds.left();
     const qreal parentInner = parentRightOfChild ? parentBounds.left() : parentBounds.right();
@@ -39,6 +56,40 @@ QVector<QPointF> routeOrthogonal(const QPointF &s, const QPointF &e,
     const qreal bottom = qMax(childBounds.bottom(), parentBounds.bottom());
     const qreal midY = (top >= kDetourGap) ? top - kDetourGap : bottom + kDetourGap;
     return {s, QPointF(s.x(), midY), QPointF(e.x(), midY), e};
+}
+
+struct SidePair
+{
+    EntityItem::Side child;
+    EntityItem::Side parent;
+};
+
+// Pick the pair of facing table edges from how the two boxes are arranged. Stacked
+// tables connect bottom-to-top (or top-to-bottom); side-by-side tables connect
+// right-to-left (or left-to-right).
+SidePair facingSides(const QRectF &childBounds, const QRectF &parentBounds)
+{
+    const QPointF delta = parentBounds.center() - childBounds.center();
+
+    const bool xOverlap = childBounds.left() <= parentBounds.right()
+                          && parentBounds.left() <= childBounds.right();
+    const bool yOverlap = childBounds.top() <= parentBounds.bottom()
+                          && parentBounds.top() <= childBounds.bottom();
+
+    bool vertical;
+    if (yOverlap && !xOverlap)
+        vertical = false;   // side by side
+    else if (xOverlap && !yOverlap)
+        vertical = true;    // stacked
+    else
+        vertical = qAbs(delta.y()) > qAbs(delta.x());
+
+    if (vertical) {
+        return delta.y() >= 0 ? SidePair{EntityItem::Side::Bottom, EntityItem::Side::Top}
+                              : SidePair{EntityItem::Side::Top, EntityItem::Side::Bottom};
+    }
+    return delta.x() >= 0 ? SidePair{EntityItem::Side::Right, EntityItem::Side::Left}
+                          : SidePair{EntityItem::Side::Left, EntityItem::Side::Right};
 }
 
 QPointF normalizedDelta(const QPointF &from, const QPointF &to)
@@ -93,16 +144,17 @@ void RelationshipItem::refresh()
         return;
     }
 
-    const bool parentRightOfChild = parentItem->pos().x() >= childItem->pos().x();
-    m_childAnchor = parentRightOfChild ? childItem->rightPortFor(childColumn->id)
-                                       : childItem->leftPortFor(childColumn->id);
-    m_parentAnchor = parentRightOfChild ? parentItem->leftPortFor(parentColumn->id)
-                                        : parentItem->rightPortFor(parentColumn->id);
-
     const QRectF childBounds = childItem->mapToScene(childItem->boundingRect()).boundingRect();
     const QRectF parentBounds = parentItem->mapToScene(parentItem->boundingRect()).boundingRect();
 
-    QVector<QPointF> points = routeOrthogonal(m_childAnchor, m_parentAnchor, childBounds, parentBounds);
+    const SidePair sides = facingSides(childBounds, parentBounds);
+    m_childAnchor = childItem->portFor(childColumn->id, sides.child);
+    m_parentAnchor = parentItem->portFor(parentColumn->id, sides.parent);
+
+    const bool vertical = sides.child == EntityItem::Side::Top
+                          || sides.child == EntityItem::Side::Bottom;
+    QVector<QPointF> points =
+        routeOrthogonal(m_childAnchor, m_parentAnchor, childBounds, parentBounds, vertical);
 
     // Optionality on the child end: derived from the FK columns' nullability.
     m_childOptional = false;

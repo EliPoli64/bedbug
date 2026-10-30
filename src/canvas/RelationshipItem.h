@@ -10,8 +10,9 @@ namespace bb {
 
 class DiagramScene;
 
-// The visual edge for one foreign-key relationship. Uses orthogonal routing between the
-// child column port and the parent column port, then overlays crow's-foot markers at both
+// The visual edge for one foreign-key relationship. Picks the facing table edges
+// (left/right when the tables sit side by side, top/bottom when one is above the other),
+// routes an orthogonal polyline between them, then overlays crow's-foot markers at both
 // ends (PLAN.md §8). Edges are re-routed when either endpoint moves. Line style follows
 // identifying (solid) vs non-identifying (dashed); the child end renders "one" instead of
 // the crow's foot when all child FK columns are unique (1:1).
@@ -29,6 +30,10 @@ public:
 
     // Which marker is drawn at the child end after the last refresh.
     Cardinality childCardinality() const { return m_childCardinality; }
+
+    // Scene-space anchors used by the last refresh (the points on each table edge).
+    QPointF childAnchor() const { return m_childAnchor; }
+    QPointF parentAnchor() const { return m_parentAnchor; }
 
     QRectF boundingRect() const override;
     QPainterPath shape() const override;

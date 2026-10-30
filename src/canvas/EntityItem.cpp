@@ -201,22 +201,34 @@ int EntityItem::columnAt(const QPointF &itemPos) const
     return static_cast<int>((itemPos.y() - bodyTop) / kRowHeight);
 }
 
-QPointF EntityItem::leftPortFor(const Id &columnId) const
+QPointF EntityItem::portFor(const Id &columnId, Side side) const
 {
     const int index = indexOfColumn(columnId);
     if (index < 0)
         return QPointF();
-    const qreal y = kHeaderHeight + index * kRowHeight + kRowHeight / 2.0;
-    return mapToScene(QPointF(0, y));
+
+    const qreal height = kHeaderHeight + (m_entity ? m_entity->columns.size() : 0) * kRowHeight;
+    switch (side) {
+    case Side::Left:
+        return mapToScene(QPointF(0, kHeaderHeight + index * kRowHeight + kRowHeight / 2.0));
+    case Side::Right:
+        return mapToScene(QPointF(m_width, kHeaderHeight + index * kRowHeight + kRowHeight / 2.0));
+    case Side::Top:
+        return mapToScene(QPointF(m_width / 2.0, 0));
+    case Side::Bottom:
+        return mapToScene(QPointF(m_width / 2.0, height));
+    }
+    return QPointF();
+}
+
+QPointF EntityItem::leftPortFor(const Id &columnId) const
+{
+    return portFor(columnId, Side::Left);
 }
 
 QPointF EntityItem::rightPortFor(const Id &columnId) const
 {
-    const int index = indexOfColumn(columnId);
-    if (index < 0)
-        return QPointF();
-    const qreal y = kHeaderHeight + index * kRowHeight + kRowHeight / 2.0;
-    return mapToScene(QPointF(m_width, y));
+    return portFor(columnId, Side::Right);
 }
 
 void EntityItem::setOnMoved(std::function<void(const QPointF &pos)> callback)
