@@ -68,6 +68,20 @@ void DiagramView::wheelEvent(QWheelEvent *event)
         event->accept();
         return;
     }
+
+    // Shift+wheel pans sideways. Trackpads may report pixel deltas or a horizontal
+    // angle delta; prefer whichever axis the device actually moved.
+    if (event->modifiers() & Qt::ShiftModifier) {
+        QPoint delta = event->pixelDelta();
+        if (delta.isNull())
+            delta = event->angleDelta();
+        const int step = delta.x() != 0 ? delta.x() : delta.y();
+        QScrollBar *bar = horizontalScrollBar();
+        bar->setValue(bar->value() - step);
+        event->accept();
+        return;
+    }
+
     QGraphicsView::wheelEvent(event);
 }
 

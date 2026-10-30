@@ -1,11 +1,15 @@
 #include "CrowsFootPainter.h"
 #include "DiagramScene.h"
+#include "DiagramView.h"
 #include "DocumentController.h"
 #include "EntityItem.h"
 #include "RelationshipItem.h"
 
+#include <QApplication>
 #include <QImage>
 #include <QPainter>
+#include <QScrollBar>
+#include <QWheelEvent>
 #include <QtMath>
 #include <QtTest>
 
@@ -123,6 +127,7 @@ private slots:
     void contextMenu_onTableEmitsRequest();
     void canvasRect_defaultA4();
     void freeTablePosition_centersAndAvoidsOverlap();
+    void shiftWheel_scrollsHorizontally();
     void expandCanvasToFit_grows();
     void autoGrow_onMove();
     void canvasContextMenu_onEmptySpace();
@@ -600,6 +605,26 @@ void CanvasTest::freeTablePosition_centersAndAvoidsOverlap()
     const QPointF ownPos = scene.freeTablePosition(customer->sceneBoundingRect().center(), size,
                                                    customer->entityId());
     QVERIFY(QRectF(ownPos, size).intersects(customer->sceneBoundingRect()));
+}
+
+void CanvasTest::shiftWheel_scrollsHorizontally()
+{
+    DiagramScene scene;
+    scene.setSceneRect(0, 0, 4000, 4000);
+    DiagramView view(&scene);
+    view.resize(300, 300);
+    view.horizontalScrollBar()->setRange(0, 1000);
+    view.verticalScrollBar()->setRange(0, 1000);
+    view.horizontalScrollBar()->setValue(500);
+    view.verticalScrollBar()->setValue(500);
+
+    // Wheel down with Shift held: the horizontal offset advances, vertical is untouched.
+    QWheelEvent wheel(QPointF(150, 150), QPointF(150, 150), QPoint(), QPoint(0, -120),
+                      Qt::NoButton, Qt::ShiftModifier, Qt::NoScrollPhase, false);
+    QCoreApplication::sendEvent(view.viewport(), &wheel);
+
+    QCOMPARE(view.horizontalScrollBar()->value(), 620);
+    QCOMPARE(view.verticalScrollBar()->value(), 500);
 }
 
 void CanvasTest::expandCanvasToFit_grows()
