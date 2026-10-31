@@ -186,6 +186,11 @@ void DiagramScene::setMarkDirtyCallback(std::function<void()> callback)
     m_markDirtyCallback = std::move(callback);
 }
 
+void DiagramScene::setNodeMoveHandler(std::function<void(const Id &, const QPointF &)> handler)
+{
+    m_nodeMoveHandler = std::move(handler);
+}
+
 QRectF DiagramScene::canvasRect() const
 {
     Diagram *diagram = const_cast<DiagramScene *>(this)->findDiagram();
@@ -364,10 +369,14 @@ void DiagramScene::syncFromModel()
 
         const Id entityId = entity->id;
         item->setOnMoved([this, entityId](const QPointF &pos) {
-            if (DiagramNode *node = nodeFor(findDiagram(), entityId))
-                node->pos = pos;
+            // Grow the working space first so the move's undo snapshot already includes
+            // any new sheet (growing the canvas is not undone by the move).
             if (EntityItem *item = itemForEntity(entityId))
                 expandCanvasToFit(item->mapToScene(item->boundingRect()).boundingRect());
+            if (m_nodeMoveHandler)
+                m_nodeMoveHandler(entityId, pos);
+            else if (DiagramNode *node = nodeFor(findDiagram(), entityId))
+                node->pos = pos;
             refreshRelationships();
             emit entityMoved(entityId, pos);
         });

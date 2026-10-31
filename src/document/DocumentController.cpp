@@ -1,11 +1,15 @@
 #include "DocumentController.h"
 
 #include "JsonSerializer.h"
+#include "commands/MoveEntityNodeCommand.h"
+#include "commands/ModelSnapshotCommand.h"
 
 #include <QFile>
+#include <QHashFunctions>
 #include <QJsonDocument>
 #include <QRectF>
 #include <QSettings>
+#include <QUndoStack>
 
 namespace bb {
 
@@ -110,6 +114,10 @@ DocumentController::DocumentController(QObject *parent)
     diagram.name = QStringLiteral("Main");
     m_model.diagrams.append(diagram);
     m_activeDiagramId = diagram.id;
+
+    connect(&m_undoStack, &QUndoStack::cleanChanged, this, [this](bool) {
+        refreshModified();
+    });
 }
 
 Diagram *DocumentController::activeDiagram()
@@ -130,7 +138,7 @@ const Diagram *DocumentController::activeDiagram() const
     return nullptr;
 }
 
-Entity *DocumentController::addEntity(const QString &name)
+Entity *DocumentController::addEntity(const QString &name, std::optional<QPointF> position)
 {
     const QString trimmed = name.trimmed();
     if (trimmed.isEmpty())
@@ -141,6 +149,8 @@ Entity *DocumentController::addEntity(const QString &name)
         if (entity.name.compare(trimmed, Qt::CaseInsensitive) == 0)
             return nullptr;
     }
+
+    const QJsonObject before = JsonSerializer::toJson(m_model);
 
     Entity entity;
     entity.id = Id::create();
@@ -169,16 +179,20 @@ Entity *DocumentController::addEntity(const QString &name)
     m_model.entities.append(entity);
 
     if (Diagram *diagram = activeDiagram()) {
-        const int index = static_cast<int>(m_model.entities.size()) - 1;
-        const int column = index % 6;
-        const int row = index / 6;
         DiagramNode node;
         node.entity = entity.id;
-        node.pos = QPointF(48.0 + column * 260.0, 48.0 + row * 140.0);
+        if (position) {
+            node.pos = *position;
+        } else {
+            const int index = static_cast<int>(m_model.entities.size()) - 1;
+            const int column = index % 6;
+            const int row = index / 6;
+            node.pos = QPointF(48.0 + column * 260.0, 48.0 + row * 140.0);
+        }
         diagram->nodes.append(node);
     }
 
-    markModifiedAndNotify();
+    commit(before, tr("Add table"));
     return &m_model.entities.last();
 }
 
@@ -209,6 +223,8 @@ Relationship *DocumentController::addRelationship(RelationshipKind kind, const I
     if (!columnsBelongTo(m_model, parentEntityId, parentColumnIds))
         return nullptr;
 
+    const QJsonObject before = JsonSerializer::toJson(m_model);
+
     // 1:1 relationships are enforced by a unique constraint on the child FK column(s).
     if (kind == RelationshipKind::OneToOne) {
         if (Entity *child = m_model.findEntity(childEntityId)) {
@@ -238,7 +254,7 @@ Relationship *DocumentController::addRelationship(RelationshipKind kind, const I
     }
 
     m_model.relationships.append(relationship);
-    markModifiedAndNotify();
+    commit(before, tr("Create relationship"));
     return &m_model.relationships.last();
 }
 
@@ -254,6 +270,8 @@ bool DocumentController::removeEntity(const Id &entityId)
     if (index < 0)
         return false;
 
+    const QJsonObject before = JsonSerializer::toJson(m_model);
+
     // Drop every relationship that touches this entity.
     m_model.relationships.removeIf([entityId](const Relationship &relationship) {
         return relationship.childEntity == entityId || relationship.parentEntity == entityId;
@@ -266,7 +284,7 @@ bool DocumentController::removeEntity(const Id &entityId)
     }
 
     m_model.entities.removeAt(index);
-    markModifiedAndNotify();
+    commit(before, tr("Remove table"));
     return true;
 }
 
@@ -286,6 +304,8 @@ bool DocumentController::removeColumn(const Id &entityId, const Id &columnId)
     if (index < 0)
         return false;
 
+    const QJsonObject before = JsonSerializer::toJson(m_model);
+
     // Drop relationships that reference the removed column.
     m_model.relationships.removeIf([columnId](const Relationship &relationship) {
         return relationship.childColumns.contains(columnId)
@@ -297,7 +317,7 @@ bool DocumentController::removeColumn(const Id &entityId, const Id &columnId)
         [columnId](const Index &index) { return index.columnIds.contains(columnId); });
 
     entity->columns.removeAt(index);
-    markModifiedAndNotify();
+    commit(before, tr("Remove column"));
     return true;
 }
 
@@ -318,8 +338,9 @@ bool DocumentController::renameEntity(const Id &entityId, const QString &name)
             return false;
     }
 
+    const QJsonObject before = JsonSerializer::toJson(m_model);
     entity->name = trimmed;
-    markModifiedAndNotify();
+    commit(before, tr("Rename table"));
     return true;
 }
 
@@ -343,6 +364,8 @@ Column *DocumentController::addColumn(const Id &entityId, const QString &name,
             return nullptr;
     }
 
+    const QJsonObject before = JsonSerializer::toJson(m_model);
+
     Column column;
     column.id = Id::create();
     column.name = trimmed;
@@ -355,7 +378,7 @@ Column *DocumentController::addColumn(const Id &entityId, const QString &name,
     column.comment = comment;
 
     entity->columns.append(column);
-    markModifiedAndNotify();
+    commit(before, tr("Add column"));
     return &entity->columns.last();
 }
 
@@ -377,13 +400,14 @@ bool DocumentController::updateColumn(const Id &entityId, const Column &column)
             return false;
     }
 
+    const QJsonObject before = JsonSerializer::toJson(m_model);
     for (Column &candidate : entity->columns) {
         if (candidate.id == column.id) {
             Column updated = column;
             updated.name = trimmed;
             updated.id = column.id;   // ids are immutable
             candidate = updated;
-            markModifiedAndNotify();
+            commit(before, tr("Edit column"));
             return true;
         }
     }
@@ -406,6 +430,8 @@ Entity *DocumentController::createManyToMany(const Id &leftEntityId, const Id &r
     const QString rightName = sanitizeTableName(right->name);
     if (leftName.isEmpty() || rightName.isEmpty())
         return nullptr;
+
+    const QJsonObject before = JsonSerializer::toJson(m_model);
 
     // Junction table: composite PK made of the two FKs.
     Entity junction;
@@ -470,7 +496,7 @@ Entity *DocumentController::createManyToMany(const Id &leftEntityId, const Id &r
         diagram->nodes.append(node);
     }
 
-    markModifiedAndNotify();
+    commit(before, tr("Create junction table"));
     return &m_model.entities.last();
 }
 
@@ -496,6 +522,8 @@ Relationship *DocumentController::addRelationshipPick(RelationshipKind kind,
         parentColumn = primaryColumnOrFirst(*parent);
     if (!parentColumn)
         return nullptr;
+
+    const QJsonObject before = JsonSerializer::toJson(m_model);
 
     // Child (FK) column: explicit > an existing "{parent}_id" > a freshly created one.
     Id childFkId = childColumnId;
@@ -543,16 +571,86 @@ Relationship *DocumentController::addRelationshipPick(RelationshipKind kind,
     }
 
     m_model.relationships.append(relationship);
-    markModifiedAndNotify();
+    commit(before, tr("Create relationship"));
     return &m_model.relationships.last();
 }
 
 // --- File lifecycle -------------------------------------------------------
 
-void DocumentController::markModifiedAndNotify()
+void DocumentController::commit(const QJsonObject &before, const QString &text)
 {
-    m_modified = true;
+    m_undoStack.push(
+        new ModelSnapshotCommand(this, before, JsonSerializer::toJson(m_model), text));
+    refreshModified();
     emit modelChanged();
+}
+
+void DocumentController::applySnapshot(const QJsonObject &snapshot)
+{
+    m_model = JsonSerializer::fromJson(snapshot);
+    emit modelChanged();
+    refreshModified();
+}
+
+void DocumentController::refreshModified()
+{
+    const bool modified = m_externalDirty || !m_undoStack.isClean();
+    if (m_modified == modified)
+        return;
+    m_modified = modified;
+    emit modifiedChanged(m_modified);
+}
+
+void DocumentController::resetHistory()
+{
+    m_externalDirty = false;
+    m_undoStack.clear();
+    refreshModified();
+}
+
+void DocumentController::moveEntityNode(const Id &entityId, const QPointF &position)
+{
+    Diagram *diagram = activeDiagram();
+    if (!diagram)
+        return;
+
+    DiagramNode *node = nullptr;
+    for (DiagramNode &candidate : diagram->nodes) {
+        if (candidate.entity == entityId) {
+            node = &candidate;
+            break;
+        }
+    }
+    if (!node || node->pos == position)
+        return;
+
+    const QPointF before = node->pos;
+    node->pos = position;
+
+    // One stable merge key per (diagram, table): consecutive pixel moves collapse into
+    // a single undo step.
+    const int mergeId =
+        static_cast<int>(qHash(diagram->id, qHash(entityId, 0)) & 0x7fffffffu);
+    m_undoStack.push(
+        new MoveEntityNodeCommand(this, diagram->id, entityId, before, position, mergeId));
+    refreshModified();
+}
+
+void DocumentController::applyNodePosition(const Id &diagramId, const Id &entityId,
+                                           const QPointF &position)
+{
+    for (Diagram &diagram : m_model.diagrams) {
+        if (diagram.id != diagramId)
+            continue;
+        for (DiagramNode &node : diagram.nodes) {
+            if (node.entity != entityId)
+                continue;
+            node.pos = position;
+            emit modelChanged();
+            refreshModified();
+            return;
+        }
+    }
 }
 
 bool DocumentController::loadFromFile(const QString &path, QString *errorMessage)
@@ -566,7 +664,7 @@ bool DocumentController::loadFromFile(const QString &path, QString *errorMessage
     m_model = loaded;
     m_activeDiagramId = activeId;
     m_filePath = path;
-    m_modified = false;
+    resetHistory();
     emit modelChanged();
     return true;
 }
@@ -576,7 +674,9 @@ bool DocumentController::saveToFile(const QString &path, QString *errorMessage)
     if (!writeModelTo(m_model, path, errorMessage))
         return false;
     m_filePath = path;
-    m_modified = false;
+    m_externalDirty = false;
+    m_undoStack.setClean();
+    refreshModified();
     return true;
 }
 
@@ -590,7 +690,7 @@ bool DocumentController::loadSession(const QString &path, QString *errorMessage)
     ensureDiagram(&loaded, &activeId);
     m_model = loaded;
     m_activeDiagramId = activeId;
-    m_modified = false;
+    resetHistory();
     emit modelChanged();
     return true;
 }
@@ -609,18 +709,19 @@ void DocumentController::newDocument()
     m_model.diagrams.append(diagram);
     m_activeDiagramId = diagram.id;
     m_filePath.clear();
-    m_modified = false;
+    resetHistory();
     emit modelChanged();
 }
 
 void DocumentController::setCanvasSize(int pagesX, int pagesY)
 {
     if (Diagram *diagram = activeDiagram()) {
+        const QJsonObject before = JsonSerializer::toJson(m_model);
         diagram->pagesX = qMax(1, pagesX);
         diagram->pagesY = qMax(1, pagesY);
         diagram->originX = 0;
         diagram->originY = 0;
-        markModifiedAndNotify();
+        commit(before, tr("Resize canvas"));
     }
 }
 
@@ -644,34 +745,38 @@ bool sheetHasNodes(const Diagram &diagram, int sheetX, int sheetY, qreal sheetWi
 void DocumentController::addSheetLeft()
 {
     if (Diagram *diagram = activeDiagram()) {
+        const QJsonObject before = JsonSerializer::toJson(m_model);
         diagram->originX -= 1;
         diagram->pagesX += 1;
-        markModifiedAndNotify();
+        commit(before, tr("Add sheet"));
     }
 }
 
 void DocumentController::addSheetRight()
 {
     if (Diagram *diagram = activeDiagram()) {
+        const QJsonObject before = JsonSerializer::toJson(m_model);
         diagram->pagesX += 1;
-        markModifiedAndNotify();
+        commit(before, tr("Add sheet"));
     }
 }
 
 void DocumentController::addSheetUp()
 {
     if (Diagram *diagram = activeDiagram()) {
+        const QJsonObject before = JsonSerializer::toJson(m_model);
         diagram->originY -= 1;
         diagram->pagesY += 1;
-        markModifiedAndNotify();
+        commit(before, tr("Add sheet"));
     }
 }
 
 void DocumentController::addSheetDown()
 {
     if (Diagram *diagram = activeDiagram()) {
+        const QJsonObject before = JsonSerializer::toJson(m_model);
         diagram->pagesY += 1;
-        markModifiedAndNotify();
+        commit(before, tr("Add sheet"));
     }
 }
 
@@ -686,9 +791,10 @@ void DocumentController::removeSheetLeft()
                               Diagram::kSheetWidth, Diagram::kSheetHeight))
                 return;
         }
+        const QJsonObject before = JsonSerializer::toJson(m_model);
         diagram->originX += 1;
         diagram->pagesX -= 1;
-        markModifiedAndNotify();
+        commit(before, tr("Remove sheet"));
     }
 }
 
@@ -703,8 +809,9 @@ void DocumentController::removeSheetRight()
                               Diagram::kSheetWidth, Diagram::kSheetHeight))
                 return;
         }
+        const QJsonObject before = JsonSerializer::toJson(m_model);
         diagram->pagesX -= 1;
-        markModifiedAndNotify();
+        commit(before, tr("Remove sheet"));
     }
 }
 
@@ -718,9 +825,10 @@ void DocumentController::removeSheetUp()
                               Diagram::kSheetWidth, Diagram::kSheetHeight))
                 return;
         }
+        const QJsonObject before = JsonSerializer::toJson(m_model);
         diagram->originY += 1;
         diagram->pagesY -= 1;
-        markModifiedAndNotify();
+        commit(before, tr("Remove sheet"));
     }
 }
 
@@ -735,14 +843,18 @@ void DocumentController::removeSheetDown()
                               Diagram::kSheetWidth, Diagram::kSheetHeight))
                 return;
         }
+        const QJsonObject before = JsonSerializer::toJson(m_model);
         diagram->pagesY -= 1;
-        markModifiedAndNotify();
+        commit(before, tr("Remove sheet"));
     }
 }
 
 void DocumentController::markDirty()
 {
-    m_modified = true;
+    if (m_externalDirty)
+        return;
+    m_externalDirty = true;
+    refreshModified();
 }
 
 } // namespace bb

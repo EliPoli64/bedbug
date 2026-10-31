@@ -2,13 +2,21 @@
 
 #include "Model.h"
 
+#include <QJsonObject>
 #include <QObject>
+#include <QUndoStack>
+
+#include <optional>
 
 namespace bb {
 
+class ModelSnapshotCommand;
+class MoveEntityNodeCommand;
+
 // Owns the in-memory document (Model + active diagram) and coordinates mutations.
-// For M3 there is no undo stack yet (M5) and no file persistence yet (M6); both plug in
-// here.
+// Every mutation is applied through a QUndoStack command, so nothing bypasses undo.
+// The modified flag is derived from the stack's clean state plus any out-of-band change
+// (canvas auto-grow).
 class DocumentController : public QObject
 {
     Q_OBJECT
@@ -22,6 +30,10 @@ public:
     Diagram *activeDiagram();
     const Diagram *activeDiagram() const;
     Id activeDiagramId() const { return m_activeDiagramId; }
+
+    // Undo/redo history. The shell creates its Undo/Redo actions from this stack.
+    QUndoStack *undoStack() { return &m_undoStack; }
+    const QUndoStack *undoStack() const { return &m_undoStack; }
 
     // --- File lifecycle -------------------------------------------------------
 
@@ -67,9 +79,9 @@ public:
     bool hasFile() const { return !m_filePath.isEmpty(); }
     QString filePath() const { return m_filePath; }
 
-    // Creates an entity plus a diagram node, positioned in a cascading grid, and emits
-    // modelChanged().
-    Entity *addEntity(const QString &name);
+    // Creates an entity plus a diagram node, positioned at `position` when given and in
+    // a cascading grid otherwise. Emits modelChanged().
+    Entity *addEntity(const QString &name, std::optional<QPointF> position = std::nullopt);
 
     // Creates a foreign-key relationship between columns of two distinct entities and
     // emits modelChanged(). Returns nullptr when either entity or any column is unknown,
@@ -115,16 +127,32 @@ public:
     // modelChanged(). Returns false when the entity or column is unknown.
     bool updateColumn(const Id &entityId, const Column &column);
 
+    // Writes a moved table's node position back to the active diagram. Consecutive moves
+    // of the same table merge into a single undo step.
+    void moveEntityNode(const Id &entityId, const QPointF &position);
+
 signals:
     void modelChanged();
+    void modifiedChanged(bool modified);
 
 private:
-    void markModifiedAndNotify();
+    // Undo-command hooks: restore a whole document snapshot, or one node position.
+    void applySnapshot(const QJsonObject &snapshot);
+    void applyNodePosition(const Id &diagramId, const Id &entityId, const QPointF &position);
+
+    void commit(const QJsonObject &before, const QString &text);
+    void refreshModified();
+    void resetHistory();
 
     Id m_activeDiagramId;
     Model m_model;
     QString m_filePath;
+    QUndoStack m_undoStack;
     bool m_modified = false;
+    bool m_externalDirty = false;
+
+    friend class ModelSnapshotCommand;
+    friend class MoveEntityNodeCommand;
 };
 
 } // namespace bb

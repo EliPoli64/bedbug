@@ -86,6 +86,10 @@ public:
     // Marks the document dirty without rebuilding (used by canvas auto-grow).
     void setMarkDirtyCallback(std::function<void()> callback);
 
+    // Called instead of writing the node position directly. The controller records the
+    // move on its undo stack (and collapses drags into one step).
+    void setNodeMoveHandler(std::function<void(const Id &, const QPointF &)> handler);
+
     // Processes one link-mode click at a scene position. Returns true when handled.
     bool handleLinkAt(const QPointF &scenePos);
 
@@ -125,6 +129,7 @@ private:
                        RelationshipKind)>
         m_relationshipHandler;
     std::function<void()> m_markDirtyCallback;
+    std::function<void(const Id &, const QPointF &)> m_nodeMoveHandler;
 };
 
 } // namespace bb

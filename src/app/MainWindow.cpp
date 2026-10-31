@@ -22,9 +22,11 @@
 #include <QMessageBox>
 #include <QSettings>
 #include <QShortcut>
+#include <QSizeF>
 #include <QStandardPaths>
 #include <QStatusBar>
 #include <QToolBar>
+#include <QUndoStack>
 
 #include <optional>
 
@@ -108,6 +110,12 @@ MainWindow::MainWindow(QWidget *parent)
         m_document->markDirty();
         updateWindowTitle();
     });
+    m_scene->setNodeMoveHandler([this](const Id &entityId, const QPointF &position) {
+        m_document->moveEntityNode(entityId, position);
+    });
+    connect(m_document, &DocumentController::modifiedChanged, this, [this] {
+        updateWindowTitle();
+    });
     createActions();
     createDock();
     createToolBars();
@@ -156,6 +164,11 @@ void MainWindow::createActions()
     m_saveAsAction->setShortcut(QKeySequence::SaveAs);
     connect(m_saveAsAction, &QAction::triggered, this, &MainWindow::saveDocumentAs);
 
+    m_undoAction = m_document->undoStack()->createUndoAction(this, tr("&Undo"));
+    m_undoAction->setShortcut(QKeySequence::Undo);
+    m_redoAction = m_document->undoStack()->createRedoAction(this, tr("&Redo"));
+    m_redoAction->setShortcut(QKeySequence::Redo);
+
     m_addTableAction = new QAction(tr("Add Table"), this);
     m_addTableAction->setShortcut(QKeySequence(Qt::CTRL | Qt::Key_T));
     m_addTableAction->setStatusTip(tr("Create a new table on the canvas"));
@@ -191,11 +204,14 @@ void MainWindow::createActions()
             }
         }
         m_addingTable = true;
-        Entity *entity = m_document->addEntity(trimmed);
+        // Place the table at the currently visible canvas centre, nudging away from
+        // existing tables. The position is part of the add command, so one Ctrl+Z
+        // removes the table instead of leaving a stray move step.
+        const QPointF center = m_view->mapToScene(m_view->viewport()->rect().center());
+        const QPointF spawn = m_scene->freeTablePosition(center, QSizeF(220, 66));
+        Entity *entity = m_document->addEntity(trimmed, spawn);
         if (entity) {
-            const Id newId = entity->id;
-            m_pendingSelect = newId;
-            placeNewTableAtViewCenter(newId);
+            m_pendingSelect = entity->id;
         } else {
             m_addingTable = false;
         }
@@ -290,6 +306,9 @@ void MainWindow::createMenus()
     fileMenu->addAction(tr("E&xit"), QKeySequence::Quit, this, &MainWindow::close);
 
     QMenu *editMenu = menuBar()->addMenu(tr("&Edit"));
+    editMenu->addAction(m_undoAction);
+    editMenu->addAction(m_redoAction);
+    editMenu->addSeparator();
     editMenu->addAction(m_addTableAction);
     editMenu->addSeparator();
     editMenu->addAction(m_oneToOneAction);
@@ -363,18 +382,6 @@ void MainWindow::showCanvasContextMenu(const QPoint &globalPos)
     QMenu menu(this);
     menu.addAction(m_canvasSizeAction);
     menu.exec(globalPos);
-}
-
-void MainWindow::placeNewTableAtViewCenter(const Id &entityId)
-{
-    EntityItem *item = m_scene->itemForEntity(entityId);
-    if (!item)
-        return;
-
-    // Use the currently visible canvas centre rather than a fixed default slot.
-    const QPointF center = m_view->mapToScene(m_view->viewport()->rect().center());
-    const QSizeF size = item->sceneBoundingRect().size();
-    item->setPos(m_scene->freeTablePosition(center, size, entityId));
 }
 
 void MainWindow::debugAddTable(const QString &name)
