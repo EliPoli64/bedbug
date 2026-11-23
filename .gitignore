@@ -1,7 +1,48 @@
+# Build directories
 build/
-CMakeFiles/
+build-*/
 cmake-build-*/
+
+# CMake in-source output
+CMakeFiles/
+CMakeCache.txt
+cmake_install.cmake
+CTestTestfile.cmake
+install_manifest.txt
+build.ninja
+.ninja_*
+compile_commands.json
+
+# Qt generated files
+*_autogen/
+.qt/
+moc_*.cpp
+moc_*.h
+qrc_*.cpp
+ui_*.h
+*.qmlc
+*.jsc
+*.user
+.qmake.stash
+
+# Test artifacts
+Testing/
+LastTest.log
+LastTestsFailed.log
+test-results/
+coverage/
+*.gcda
+*.gcno
+*.gcov
+junit*.xml
+
+# Compiled objects
 *.o
 *.obj
-*.user
-compile_commands.json
+*.so
+*.dylib
+*.dll
+*.lib
+*.a
+*.exe
+*.pdb
