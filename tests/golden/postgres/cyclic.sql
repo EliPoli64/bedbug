@@ -1,5 +1,5 @@
 -- ------------------------------------------------------
--- bedbug forward engineering script
+-- beDBug forward engineering script
 -- Target engine: PostgreSQL
 -- ------------------------------------------------------
 
