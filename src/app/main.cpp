@@ -2,10 +2,10 @@
 #include "Theme.h"
 
 #include <QApplication>
-#include <QFont>
 #include <QIcon>
 #include <QPainter>
 #include <QPixmap>
+#include <QSvgRenderer>
 
 using namespace bb;
 
@@ -13,22 +13,21 @@ namespace {
 
 QIcon bedbugIcon()
 {
-    QPixmap pixmap(64, 64);
-    pixmap.fill(Qt::transparent);
-    {
+    QSvgRenderer renderer(QStringLiteral(":/assets/logo.svg"));
+    QIcon icon;
+
+    for (int size : {16, 24, 32, 48, 64, 128, 256}) {
+        QPixmap pixmap(size, size);
+        pixmap.fill(Qt::transparent);
+
         QPainter painter(&pixmap);
         painter.setRenderHint(QPainter::Antialiasing);
-        painter.setPen(Qt::NoPen);
-        painter.setBrush(QApplication::palette().color(QPalette::Highlight));
-        painter.drawRoundedRect(QRectF(2, 2, 60, 60), 14, 14);
-        painter.setPen(Qt::white);
-        QFont font = painter.font();
-        font.setPointSize(26);
-        font.setBold(true);
-        painter.setFont(font);
-        painter.drawText(pixmap.rect(), Qt::AlignCenter, QStringLiteral("b"));
+        renderer.render(&painter);
+
+        icon.addPixmap(pixmap);
     }
-    return QIcon(pixmap);
+
+    return icon;
 }
 
 } // namespace

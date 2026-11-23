@@ -2,6 +2,7 @@
 
 #include "DiagramView.h"
 #include "Id.h"
+#include "dialects/Postgres.h"
 
 #include <QMainWindow>
 
@@ -10,6 +11,7 @@ namespace bb {
 class DiagramScene;
 class DocumentController;
 class EntityEditorPanel;
+class SqlPreviewPanel;
 
 class MainWindow : public QMainWindow
 {
@@ -59,6 +61,8 @@ protected:
     DiagramScene *m_scene = nullptr;
     DiagramView *m_view = nullptr;
     EntityEditorPanel *m_entityPanel = nullptr;
+    SqlPreviewPanel *m_sqlPreview = nullptr;
+    PostgresDialect m_postgresDialect;
     QAction *m_addTableAction = nullptr;
     QAction *m_newAction = nullptr;
     QAction *m_openAction = nullptr;

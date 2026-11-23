@@ -6,6 +6,7 @@
 #include "EntityEditorPanel.h"
 #include "EntityItem.h"
 #include "SettingsDialog.h"
+#include "SqlPreviewPanel.h"
 
 #include <QAction>
 #include <QActionGroup>
@@ -333,6 +334,8 @@ void MainWindow::createMenus()
     viewMenu->addAction(m_canvasSizeAction);
     if (auto *dock = qobject_cast<QDockWidget *>(m_entityPanel->parentWidget()))
         viewMenu->addAction(dock->toggleViewAction());
+    if (auto *dock = qobject_cast<QDockWidget *>(m_sqlPreview->parentWidget()))
+        viewMenu->addAction(dock->toggleViewAction());
 }
 
 void MainWindow::createDock()
@@ -346,6 +349,17 @@ void MainWindow::createDock()
     dock->setWidget(m_entityPanel);
 
     addDockWidget(Qt::RightDockWidgetArea, dock);
+
+    auto *sqlDock = new QDockWidget(tr("SQL Preview"), this);
+    sqlDock->setObjectName(QStringLiteral("sqlPreviewDock"));
+    sqlDock->setAllowedAreas(Qt::AllDockWidgetAreas);
+
+    m_sqlPreview = new SqlPreviewPanel(sqlDock);
+    m_sqlPreview->setDialect(m_postgresDialect);
+    m_sqlPreview->setDocument(m_document);
+    sqlDock->setWidget(m_sqlPreview);
+
+    addDockWidget(Qt::BottomDockWidgetArea, sqlDock);
 }
 
 void MainWindow::syncScenePreservingSelection()

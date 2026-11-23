@@ -240,7 +240,7 @@ QString SqlGenerator::generate(const Model &model, const SqlDialect &dialect,
 
     const QString header = QStringLiteral(
                                "-- ------------------------------------------------------\n"
-                               "-- bedbug forward engineering script\n"
+                               "-- beDBug forward engineering script\n"
                                "-- Target engine: %1\n"
                                "-- ------------------------------------------------------")
                                .arg(dialect.displayName());
