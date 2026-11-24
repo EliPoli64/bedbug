@@ -14,8 +14,9 @@ SQL DDL generation.
 
 > [!NOTE]
 > beDBug is in active development. The editor, canvas, relationships, undo/redo,
-> document lifecycle, live SQL preview, and PostgreSQL/MySQL engine switching work today;
-> the type-advisory panel and PDF export are next. See the [roadmap](#roadmap).
+> document lifecycle, live SQL preview, and PostgreSQL/MySQL/SQL Server engine switching
+> with type advisories and one-click resolution work today; PDF export is next. See the
+> [roadmap](#roadmap).
 
 ## Why beDBug?
 
@@ -40,7 +41,7 @@ output rather than an afterthought.
 | **Relationships** | 1:1, 1:N and N:M tools with crow's-foot (IE) notation, orthogonal routing, optional direction arrows, and FK columns resolved automatically. |
 | **Undo / redo** | Every structural and geometric edit goes through a command stack. |
 | **Documents** | New / Open / Save / Save As, dirty tracking, recent session restore, single-file JSON format. |
-| **SQL generation** | Live read-only SQL preview with syntax highlighting, Copy and Save; switch between PostgreSQL and MySQL in one click. Dependency-ordered tables, indexes, and cycle-safe foreign keys, covered by golden-file tests. |
+| **SQL generation** | Live read-only SQL preview with syntax highlighting, Copy and Save; switch between PostgreSQL, MySQL and SQL Server in one click. A fidelity chip names the columns each engine had to adapt, marks them on the canvas, and **Resolve all** records the choices per engine as one undo step. Dependency-ordered tables, indexes, and cycle-safe foreign keys, covered by golden-file tests. |
 | **Themes** | Calm default palette plus several dark themes, switchable from Settings. |
 | **Tests** | Headless model, serialization, SQL and command tests wired into CTest. |
 
@@ -93,9 +94,9 @@ cmake --build build
 
 ### Planned for the first release
 
-- Additional dialects (MariaDB, SQL Server, SQLite)
+- Additional dialects (MariaDB, SQLite)
 - PDF export of the diagram
-- Advisory panel for lossy type mappings and unresolved decisions
+- Grouped per-issue advisory panel (beyond the current chip + Resolve all)
 
 
 ## Usage
@@ -137,7 +138,7 @@ bedbug/
 ├── CMakeLists.txt            # top-level project, Qt setup, tests
 ├── src/
 │   ├── core/                 # model, canonical types, JSON — QtCore only, no UI
-│   ├── sqlgen/               # dialect interface, registry, PostgreSQL + MySQL generators
+│   ├── sqlgen/               # dialect interface, registry, PostgreSQL/MySQL/SQL Server generators
 │   ├── document/             # document controller, undo/redo commands
 │   ├── canvas/               # QGraphicsScene/View, entity items, crow's-foot edges
 │   ├── app/                  # main window, dialogs, themes, application entry point
@@ -156,7 +157,7 @@ bedbug/
 - [x] M4 — Relationships, crow's-foot notation, cascade rules
 - [x] M5 — Undo/redo command stack
 - [x] M6 — File lifecycle and session restore
-- [ ] M7 — SQL preview, engine switching, type advisories (preview + switching done)
+- [x] M7 — SQL preview, engine switching, fidelity chip and Resolve all
 - [ ] M8 — PDF export
 - [ ] M9 — Thin-slice hardening
 
