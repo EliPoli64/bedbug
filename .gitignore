@@ -46,3 +46,8 @@ junit*.xml
 *.a
 *.exe
 *.pdb
+
+# Other
+*.md
+!README.md
+.ignore
