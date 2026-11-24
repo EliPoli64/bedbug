@@ -106,6 +106,45 @@ QString SqlGenerator::resolveType(const Entity &entity, const Column &column,
     return dialect.mapType(column.type).sqlType;
 }
 
+QList<TypeAdvisory> SqlGenerator::auditTypes(const Model &model, const SqlDialect &dialect)
+{
+    QList<TypeAdvisory> advisories;
+
+    for (const Entity &entity : model.entities) {
+        for (const Column &column : entity.columns) {
+            // Accepted decisions are no longer advisories.
+            if (column.dialectOverrides.contains(dialect.id()))
+                continue;
+            if (!column.nativeType.isEmpty() && column.nativeType.engine == dialect.id())
+                continue;
+
+            const TypeMapping mapping = dialect.mapType(column.type);
+            if (!fidelityNeedsReview(mapping.fidelity))
+                continue;
+
+            // A dialect-native enum type is an exact representation (e.g. PostgreSQL
+            // CREATE TYPE ... AS ENUM), so it never needs review.
+            if (column.type.kind == CanonicalType::Kind::Enum
+                && !dialect.enumTypeName(entity, column).isEmpty())
+                continue;
+
+            TypeAdvisory advisory;
+            advisory.entityId = entity.id;
+            advisory.columnId = column.id;
+            advisory.entityName = entity.name;
+            advisory.columnName = column.name;
+            advisory.canonicalType = column.type.displayName();
+            advisory.resolvedType = resolveType(entity, column, dialect);
+            advisory.fidelity = mapping.fidelity;
+            advisory.note = mapping.note;
+            advisory.suggestedOverride = mapping.suggestedOverride;
+            advisories.append(advisory);
+        }
+    }
+
+    return advisories;
+}
+
 QList<QString> SqlGenerator::statements(const Model &model, const SqlDialect &dialect,
                                         const SqlGenOptions &options) const
 {

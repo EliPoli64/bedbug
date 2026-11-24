@@ -34,6 +34,7 @@ private:
     void updateStatusMessage();
     void applyRuntimeSettings();
     void setTargetDialect(const QString &id);
+    void updateTypeAdvisories();
 
     bool m_initialCenter = true;
     bool m_addingTable = false;

@@ -24,7 +24,10 @@
 #include <QTextCharFormat>
 #include <QTextDocument>
 #include <QTimer>
+#include <QToolButton>
 #include <QVBoxLayout>
+
+#include <utility>
 
 namespace bb {
 
@@ -152,8 +155,17 @@ SqlPreviewPanel::SqlPreviewPanel(QWidget *parent)
     dialectFont.setBold(true);
     m_dialectLabel->setFont(dialectFont);
 
-    m_summaryLabel = new QLabel(this);
-    m_summaryLabel->setObjectName(QStringLiteral("sqlPreviewSummary"));
+    m_fidelityChip = new QToolButton(this);
+    m_fidelityChip->setObjectName(QStringLiteral("sqlFidelityChip"));
+    m_fidelityChip->setAutoRaise(true);
+    m_fidelityChip->setToolButtonStyle(Qt::ToolButtonTextOnly);
+    m_fidelityChip->setToolTip(tr("Column types adapted for this engine; use Resolve all to record them"));
+
+    m_resolveAllButton = new QPushButton(tr("Resolve all"), this);
+    m_resolveAllButton->setObjectName(QStringLiteral("resolveAllButton"));
+    m_resolveAllButton->setToolTip(
+        tr("Record the adapted types as overrides for this engine (one undo step)"));
+    m_resolveAllButton->setEnabled(false);
 
     m_copyButton = new QPushButton(tr("Copy"), this);
     m_copyButton->setObjectName(QStringLiteral("sqlCopyButton"));
@@ -163,8 +175,9 @@ SqlPreviewPanel::SqlPreviewPanel(QWidget *parent)
     m_saveButton->setEnabled(false);
 
     header->addWidget(m_dialectLabel);
-    header->addWidget(m_summaryLabel);
+    header->addWidget(m_fidelityChip);
     header->addStretch(1);
+    header->addWidget(m_resolveAllButton);
     header->addWidget(m_copyButton);
     header->addWidget(m_saveButton);
     layout->addLayout(header);
@@ -185,6 +198,7 @@ SqlPreviewPanel::SqlPreviewPanel(QWidget *parent)
 
     connect(m_copyButton, &QPushButton::clicked, this, &SqlPreviewPanel::copyToClipboard);
     connect(m_saveButton, &QPushButton::clicked, this, &SqlPreviewPanel::chooseFileAndSave);
+    connect(m_resolveAllButton, &QPushButton::clicked, this, &SqlPreviewPanel::resolveAll);
 
     setMinimumHeight(140);
     refresh();
@@ -210,6 +224,18 @@ void SqlPreviewPanel::setDialect(const SqlDialect &dialect)
     refresh();
 }
 
+QString SqlPreviewPanel::fidelityText() const
+{
+    if (!m_dialect)
+        return {};
+    const QString name = m_dialect->displayName();
+    if (m_controller && m_controller->model()->entities.isEmpty())
+        return tr("No tables");
+    if (m_advisories.isEmpty())
+        return QStringLiteral("%1 ✓").arg(name);
+    return tr("%1 ⚠ %n type(s) adapted", nullptr, advisoryCount()).arg(name);
+}
+
 void SqlPreviewPanel::refresh()
 {
     m_refreshTimer->stop();
@@ -219,7 +245,10 @@ void SqlPreviewPanel::refresh()
     if (!m_controller || !m_dialect) {
         m_sql.clear();
         m_editor->clear();
-        m_summaryLabel->clear();
+        m_advisories.clear();
+        m_fidelityChip->setText(QString());
+        m_fidelityChip->setToolTip(QString());
+        m_resolveAllButton->setEnabled(false);
         m_copyButton->setEnabled(false);
         m_saveButton->setEnabled(false);
         return;
@@ -231,20 +260,60 @@ void SqlPreviewPanel::refresh()
     if (model.entities.isEmpty()) {
         m_sql.clear();
         m_editor->setPlainText(tr("-- No tables yet. Add one to see SQL here."));
-        m_summaryLabel->setText(tr("No tables"));
+        m_advisories.clear();
+        m_fidelityChip->setText(fidelityText());
+        m_fidelityChip->setToolTip(QString());
+        m_resolveAllButton->setEnabled(false);
         m_copyButton->setEnabled(false);
         m_saveButton->setEnabled(false);
         return;
     }
 
     m_sql = generator.generate(model, *m_dialect);
+    m_advisories = generator.auditTypes(model, *m_dialect);
     m_editor->setPlainText(m_sql);
-    m_summaryLabel->setText(
-        tr("%n statement(s)", nullptr, generator.statements(model, *m_dialect).size()));
+    m_fidelityChip->setText(fidelityText());
+
+    // Tooltip groups the first few affected columns so the chip is self-explanatory.
+    QStringList details;
+    const int shown = qMin<int>(6, m_advisories.size());
+    for (int i = 0; i < shown; ++i) {
+        const TypeAdvisory &advisory = m_advisories.at(i);
+        QString line = QStringLiteral("%1.%2: %3 → %4 (%5)")
+                           .arg(advisory.entityName, advisory.columnName,
+                                advisory.canonicalType, advisory.resolvedType,
+                                fidelityName(advisory.fidelity));
+        if (!advisory.note.isEmpty())
+            line += QStringLiteral(" — ") + advisory.note;
+        details.append(line);
+    }
+    if (m_advisories.size() > shown)
+        details.append(tr("… and %n more", nullptr, m_advisories.size() - shown));
+    m_fidelityChip->setToolTip(details.join(QLatin1Char('\n')));
+
+    m_resolveAllButton->setEnabled(!m_advisories.isEmpty());
     m_copyButton->setEnabled(true);
     m_saveButton->setEnabled(true);
 
     m_editor->verticalScrollBar()->setValue(scroll);
+}
+
+int SqlPreviewPanel::resolveAll()
+{
+    if (!m_controller || !m_dialect || m_advisories.isEmpty())
+        return 0;
+
+    QList<ColumnTypeOverride> overrides;
+    overrides.reserve(m_advisories.size());
+    for (const TypeAdvisory &advisory : std::as_const(m_advisories)) {
+        overrides.append(
+            ColumnTypeOverride{advisory.entityId, advisory.columnId, advisory.resolvedType});
+    }
+
+    const int applied = m_controller->applyTypeOverrides(m_dialect->id(), overrides);
+    if (applied > 0)
+        refresh();
+    return applied;
 }
 
 void SqlPreviewPanel::scheduleRefresh()

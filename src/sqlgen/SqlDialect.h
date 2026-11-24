@@ -28,6 +28,32 @@ struct TypeMapping
     QString suggestedOverride;  // e.g. "nvarchar(max)"; empty when none applies
 };
 
+// Lower-case machine-readable name for a fidelity level (also used in tests).
+inline QString fidelityName(Fidelity fidelity)
+{
+    switch (fidelity) {
+    case Fidelity::Exact:
+        return QStringLiteral("exact");
+    case Fidelity::Widened:
+        return QStringLiteral("widened");
+    case Fidelity::Narrowed:
+        return QStringLiteral("narrowed");
+    case Fidelity::Lossy:
+        return QStringLiteral("lossy");
+    case Fidelity::Unsupported:
+        return QStringLiteral("unsupported");
+    }
+    return {};
+}
+
+// True when a mapping deserves a warning badge. Widened mappings are lossless and stay
+// silent (PLAN.md §7.3).
+inline bool fidelityNeedsReview(Fidelity fidelity)
+{
+    return fidelity == Fidelity::Narrowed || fidelity == Fidelity::Lossy
+           || fidelity == Fidelity::Unsupported;
+}
+
 // Options that shape generated scripts (PLAN.md §6).
 struct SqlGenOptions
 {

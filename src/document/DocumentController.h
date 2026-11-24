@@ -13,6 +13,14 @@ namespace bb {
 class ModelSnapshotCommand;
 class MoveEntityNodeCommand;
 
+// One accepted per-engine type decision (PLAN.md §7.5). Applied as a single undo step.
+struct ColumnTypeOverride
+{
+    Id entityId;
+    Id columnId;
+    QString rawType;
+};
+
 // Owns the in-memory document (Model + active diagram) and coordinates mutations.
 // Every mutation is applied through a QUndoStack command, so nothing bypasses undo.
 // The modified flag is derived from the stack's clean state plus any out-of-band change
@@ -126,6 +134,12 @@ public:
     // Replaces an existing column's definition (its id is preserved) and emits
     // modelChanged(). Returns false when the entity or column is unknown.
     bool updateColumn(const Id &entityId, const Column &column);
+
+    // Writes `dialectOverrides[dialectId] = rawType` for every entry as one undoable
+    // command ("Resolve types"). Entries that are already decided are skipped. Returns
+    // the number of columns changed; 0 leaves the document (and undo stack) untouched.
+    int applyTypeOverrides(const QString &dialectId,
+                           const QList<ColumnTypeOverride> &overrides);
 
     // Writes a moved table's node position back to the active diagram. Consecutive moves
     // of the same table merge into a single undo step.

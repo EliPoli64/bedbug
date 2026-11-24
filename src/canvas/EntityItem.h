@@ -6,6 +6,7 @@
 #include "Id.h"
 
 #include <QGraphicsItem>
+#include <QSet>
 
 #include <functional>
 
@@ -60,6 +61,11 @@ public:
     // Test hook: the label currently painted for a column.
     QString typeLabelFor(const Id &columnId) const;
 
+    // Columns whose mapped type needed adaptation for the selected engine (PLAN.md §7.3).
+    // Affected rows paint a small amber warning marker before the type label.
+    void setAdvisoryColumns(const QSet<Id> &columnIds);
+    bool isAdvisory(const Id &columnId) const { return m_advisoryColumns.contains(columnId); }
+
     qreal contentWidth() const;
 
 protected:
@@ -72,6 +78,7 @@ private:
 
     const Entity *m_entity = nullptr;
     qreal m_width = 140.0;
+    QSet<Id> m_advisoryColumns;
     TypeFormatter m_typeFormatter;
     std::function<void(const QPointF &pos)> m_onMoved;
 };

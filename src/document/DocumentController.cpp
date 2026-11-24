@@ -414,6 +414,39 @@ bool DocumentController::updateColumn(const Id &entityId, const Column &column)
     return false;
 }
 
+int DocumentController::applyTypeOverrides(const QString &dialectId,
+                                           const QList<ColumnTypeOverride> &overrides)
+{
+    if (dialectId.isEmpty() || overrides.isEmpty())
+        return 0;
+
+    QList<ColumnTypeOverride> applicable;
+    for (const ColumnTypeOverride &override : overrides) {
+        Entity *entity = m_model.findEntity(override.entityId);
+        if (!entity)
+            continue;
+        Column *column = entity->findColumn(override.columnId);
+        if (!column)
+            continue;
+        if (column->dialectOverrides.value(dialectId) == override.rawType)
+            continue;
+        applicable.append(override);
+    }
+    if (applicable.isEmpty())
+        return 0;
+
+    const QJsonObject before = JsonSerializer::toJson(m_model);
+    for (const ColumnTypeOverride &override : applicable) {
+        Entity *entity = m_model.findEntity(override.entityId);
+        Column *column = entity ? entity->findColumn(override.columnId) : nullptr;
+        if (column)
+            column->dialectOverrides.insert(dialectId, override.rawType);
+    }
+
+    commit(before, tr("Resolve types"));
+    return applicable.size();
+}
+
 Entity *DocumentController::createManyToMany(const Id &leftEntityId, const Id &rightEntityId)
 {
     Entity *left = m_model.findEntity(leftEntityId);

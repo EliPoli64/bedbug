@@ -79,6 +79,17 @@ void DiagramScene::refreshTypeLabels()
     refreshRelationships();
 }
 
+void DiagramScene::setAdvisoryColumns(const QSet<Id> &columnIds)
+{
+    if (m_advisoryColumns == columnIds)
+        return;
+    m_advisoryColumns = columnIds;
+    for (EntityItem *item : std::as_const(m_items))
+        item->setAdvisoryColumns(m_advisoryColumns);
+    // The extra marker width can shift the edge ports.
+    refreshRelationships();
+}
+
 void DiagramScene::setLinkTool(std::optional<RelationshipKind> tool)
 {
     if (m_linkTool == tool)
@@ -377,6 +388,7 @@ void DiagramScene::syncFromModel()
 
         auto *item = new EntityItem(entity);
         item->setTypeFormatter(m_columnTypeFormatter);
+        item->setAdvisoryColumns(m_advisoryColumns);
         item->setFlag(QGraphicsItem::ItemIsMovable);
         item->setFlag(QGraphicsItem::ItemIsSelectable);
         item->setFlag(QGraphicsItem::ItemSendsGeometryChanges);

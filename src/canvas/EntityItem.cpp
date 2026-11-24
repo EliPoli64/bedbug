@@ -17,6 +17,9 @@ namespace bb {
 
 namespace {
 
+constexpr qreal kAdvisoryMarkerWidth = 14.0;
+constexpr QColor kAdvisoryColor(230, 154, 0);
+
 // Header bar with rounded top corners, matching the box's corner radius.
 QPainterPath roundedTopPath(const QRectF &rect, qreal radius)
 {
@@ -70,10 +73,21 @@ qreal EntityItem::measureWidth() const
     for (const Column &column : m_entity->columns) {
         const qreal rowText = metrics.horizontalAdvance(column.name)
                               + metrics.horizontalAdvance(typeLabel(column))
-                              + kBadgeWidth + kHPadding * 2 + 12.0;
+                              + kBadgeWidth + kHPadding * 2 + 12.0
+                              + (m_advisoryColumns.contains(column.id) ? kAdvisoryMarkerWidth : 0.0);
         width = qMax(width, rowText);
     }
     return qMin(width, 440.0);
+}
+
+void EntityItem::setAdvisoryColumns(const QSet<Id> &columnIds)
+{
+    if (m_advisoryColumns == columnIds)
+        return;
+    prepareGeometryChange();
+    m_advisoryColumns = columnIds;
+    m_width = measureWidth();
+    update();
 }
 
 void EntityItem::setTypeFormatter(TypeFormatter formatter)
@@ -214,12 +228,27 @@ void EntityItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option
             painter->drawEllipse(dotCenter, 2.2, 2.2);
         }
 
-        // Type, right-aligned, muted.
+        // Type, right-aligned, muted, preceded by a warning marker when adapted.
         const QString typeText = typeLabel(column);
         const qreal typeWidth = metrics.horizontalAdvance(typeText);
-        const QRectF typeRect(m_width - kHPadding - typeWidth, y, typeWidth, kRowHeight);
+        const bool advisory = m_advisoryColumns.contains(column.id);
+        const qreal typeRight = m_width - kHPadding - (advisory ? kAdvisoryMarkerWidth : 0.0);
+        const QRectF typeRect(typeRight - typeWidth, y, typeWidth, kRowHeight);
         painter->setPen(mutedColor);
         painter->drawText(typeRect, Qt::AlignRight | Qt::AlignVCenter, typeText);
+
+        if (advisory) {
+            const qreal centreX = m_width - kHPadding - kAdvisoryMarkerWidth / 2.0;
+            const qreal centreY = y + kRowHeight / 2.0;
+            QPainterPath triangle;
+            triangle.moveTo(centreX, centreY - 4.5);
+            triangle.lineTo(centreX + 4.5, centreY + 3.5);
+            triangle.lineTo(centreX - 4.5, centreY + 3.5);
+            triangle.closeSubpath();
+            painter->setPen(Qt::NoPen);
+            painter->setBrush(kAdvisoryColor);
+            painter->drawPath(triangle);
+        }
 
         y += kRowHeight;
     }

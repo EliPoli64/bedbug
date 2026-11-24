@@ -4,6 +4,7 @@
 #include "Model.h"
 
 #include <QGraphicsScene>
+#include <QSet>
 
 #include <functional>
 #include <optional>
@@ -43,6 +44,11 @@ public:
     using ColumnTypeFormatter = std::function<QString(const Entity &, const Column &)>;
     void setColumnTypeFormatter(ColumnTypeFormatter formatter);
     void refreshTypeLabels();
+
+    // Columns whose mapped type needed adaptation for the selected engine. Kept here so
+    // newly (re)built EntityItems inherit the marker state during syncFromModel().
+    void setAdvisoryColumns(const QSet<Id> &columnIds);
+    const QSet<Id> &advisoryColumns() const { return m_advisoryColumns; }
 
     // The active Diagram within m_model, or nullptr.
     Diagram *currentDiagram();
@@ -125,6 +131,7 @@ private:
     QHash<Id, EntityItem *> m_items;
     QHash<Id, RelationshipItem *> m_relationshipItems;
     ColumnTypeFormatter m_columnTypeFormatter;
+    QSet<Id> m_advisoryColumns;
     bool m_snapToGrid = false;   // Workbench-like free dragging by default
     bool m_autoGrowCanvas = true;
 

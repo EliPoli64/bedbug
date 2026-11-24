@@ -7,6 +7,21 @@
 
 namespace bb {
 
+// One column whose canonical type the target engine cannot represent exactly. These drive
+// the fidelity chip and the "Resolve all" action (PLAN.md §7.3, §7.8).
+struct TypeAdvisory
+{
+    Id entityId;
+    Id columnId;
+    QString entityName;
+    QString columnName;
+    QString canonicalType;    // human-readable, e.g. "json"
+    QString resolvedType;     // what generation currently emits
+    Fidelity fidelity = Fidelity::Exact;
+    QString note;             // why it matters
+    QString suggestedOverride; // alternative the dialect recommends, when any
+};
+
 // Turns a Model into a dialect-specific DDL script (PLAN.md §6).
 class SqlGenerator
 {
@@ -32,6 +47,11 @@ public:
     static QString resolveType(const Entity &entity,
                                const Column &column,
                                const SqlDialect &dialect);
+
+    // Every column whose mapping needs review for this engine. Columns with an explicit
+    // override or a matching native hint are considered decided and are not reported.
+    // Widened mappings are lossless and stay silent.
+    static QList<TypeAdvisory> auditTypes(const Model &model, const SqlDialect &dialect);
 };
 
 } // namespace bb

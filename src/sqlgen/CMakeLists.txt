@@ -8,6 +8,8 @@ qt_add_library(bb_sqlgen STATIC
     dialects/MySql.h
     dialects/Postgres.cpp
     dialects/Postgres.h
+    dialects/SqlServer.cpp
+    dialects/SqlServer.h
 )
 
 target_include_directories(bb_sqlgen PUBLIC

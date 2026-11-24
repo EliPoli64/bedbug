@@ -25,6 +25,7 @@
 #include <QMenuBar>
 #include <QMessageBox>
 #include <QSettings>
+#include <QSet>
 #include <QShortcut>
 #include <QSizeF>
 #include <QStandardPaths>
@@ -394,7 +395,21 @@ void MainWindow::setTargetDialect(const QString &id)
     m_dialect = dialect;
     m_sqlPreview->setDialect(*m_dialect);
     m_scene->refreshTypeLabels();
+    updateTypeAdvisories();
     QSettings().setValue(QStringLiteral("targetDialect"), id);
+}
+
+void MainWindow::updateTypeAdvisories()
+{
+    QSet<Id> columns;
+    if (m_dialect) {
+        const SqlGenerator generator;
+        for (const TypeAdvisory &advisory :
+             generator.auditTypes(*m_document->model(), *m_dialect)) {
+            columns.insert(advisory.columnId);
+        }
+    }
+    m_scene->setAdvisoryColumns(columns);
 }
 
 void MainWindow::syncScenePreservingSelection()
@@ -415,6 +430,7 @@ void MainWindow::syncScenePreservingSelection()
     m_pendingSelect = Id();
 
     m_scene->syncFromModel();
+    updateTypeAdvisories();
     if (!keep.isNull()) {
         if (EntityItem *item = m_scene->itemForEntity(keep))
             item->setSelected(true);

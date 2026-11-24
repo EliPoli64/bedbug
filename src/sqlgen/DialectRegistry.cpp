@@ -2,6 +2,7 @@
 
 #include "dialects/MySql.h"
 #include "dialects/Postgres.h"
+#include "dialects/SqlServer.h"
 
 namespace bb {
 
@@ -19,11 +20,17 @@ const SqlDialect *mysql()
     return &dialect;
 }
 
+const SqlDialect *sqlServer()
+{
+    static const SqlServerDialect dialect;
+    return &dialect;
+}
+
 } // namespace
 
 QList<const SqlDialect *> DialectRegistry::all()
 {
-    return {postgres(), mysql()};
+    return {postgres(), mysql(), sqlServer()};
 }
 
 const SqlDialect *DialectRegistry::find(const QString &id)
