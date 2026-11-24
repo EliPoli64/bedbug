@@ -20,3 +20,14 @@ target_link_libraries(tst_golden PRIVATE
 )
 
 add_test(NAME tst_golden COMMAND tst_golden)
+
+qt_add_executable(tst_sqlserver
+    tst_sqlserver.cpp
+)
+
+target_link_libraries(tst_sqlserver PRIVATE
+    Qt6::Test
+    bb_sqlgen
+)
+
+add_test(NAME tst_sqlserver COMMAND tst_sqlserver)

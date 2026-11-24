@@ -134,6 +134,7 @@ private slots:
     void canvasContextMenu_onEmptySpace();
     void crowsfoot_markersRenderDistinctly();
     void entityItem_typeLabelsFollowFormatter();
+    void entityItem_advisoryColumnsMarkRows();
 };
 
 void CanvasTest::syncFromModel_createsItems()
@@ -793,6 +794,41 @@ void CanvasTest::entityItem_typeLabelsFollowFormatter()
 
     scene.setColumnTypeFormatter({});
     QCOMPARE(item->typeLabelFor(pk.id), QStringLiteral("bigint"));
+}
+
+void CanvasTest::entityItem_advisoryColumnsMarkRows()
+{
+    Model *model = new Model(twoEntitySceneModel());
+    DiagramScene scene;
+    scene.setModel(model);
+    scene.setActiveDiagramId(model->diagrams.first().id);
+
+    // Wide labels make the marker's extra width observable.
+    scene.setColumnTypeFormatter(
+        [](const Entity &, const Column &) { return QString(20, QLatin1Char('W')); });
+    scene.syncFromModel();
+
+    const Entity &customer = model->entities.first();
+    const Column &email = customer.columns.last();
+    EntityItem *item = scene.itemForEntity(customer.id);
+    QVERIFY(item);
+    QVERIFY(!item->isAdvisory(email.id));
+    const qreal plainWidth = item->contentWidth();
+
+    scene.setAdvisoryColumns({email.id});
+    QVERIFY(item->isAdvisory(email.id));
+    QVERIFY(item->contentWidth() > plainWidth);
+
+    // Rebuilding items keeps the advisory state.
+    scene.syncFromModel();
+    item = scene.itemForEntity(customer.id);
+    QVERIFY(item);
+    QVERIFY(item->isAdvisory(email.id));
+
+    scene.setAdvisoryColumns({});
+    QVERIFY(!item->isAdvisory(email.id));
+
+    delete model;
 }
 
 QTEST_MAIN(CanvasTest)

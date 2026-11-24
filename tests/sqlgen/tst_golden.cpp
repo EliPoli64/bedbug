@@ -101,11 +101,14 @@ private slots:
 void GoldenTest::registry()
 {
     const QList<const SqlDialect *> dialects = DialectRegistry::all();
-    QCOMPARE(dialects.size(), 2);
+    QCOMPARE(dialects.size(), 3);
     QCOMPARE(dialects.first()->id(), QStringLiteral("postgres"));
     QCOMPARE(dialects.at(1)->id(), QStringLiteral("mysql"));
+    QCOMPARE(dialects.at(2)->id(), QStringLiteral("sqlserver"));
     QCOMPARE(DialectRegistry::fallback()->id(), QStringLiteral("postgres"));
     QCOMPARE(DialectRegistry::find(QStringLiteral("mysql"))->id(), QStringLiteral("mysql"));
+    QCOMPARE(DialectRegistry::find(QStringLiteral("sqlserver"))->id(),
+             QStringLiteral("sqlserver"));
     QVERIFY(!DialectRegistry::find(QStringLiteral("nope")));
 }
 

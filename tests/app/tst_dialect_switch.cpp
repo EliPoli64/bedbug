@@ -23,9 +23,10 @@ private slots:
 void DialectSwitchTest::selector_listsRegisteredDialects()
 {
     DialectSelector selector;
-    QCOMPARE(selector.count(), 2);
+    QCOMPARE(selector.count(), 3);
     QCOMPARE(selector.itemData(0).toString(), QStringLiteral("postgres"));
     QCOMPARE(selector.itemData(1).toString(), QStringLiteral("mysql"));
+    QCOMPARE(selector.itemData(2).toString(), QStringLiteral("sqlserver"));
     QCOMPARE(selector.currentDialectId(), QStringLiteral("postgres"));
 }
 

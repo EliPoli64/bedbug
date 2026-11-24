@@ -2,6 +2,7 @@
 #include "JsonSerializer.h"
 #include "SqlPreviewPanel.h"
 #include "dialects/Postgres.h"
+#include "dialects/SqlServer.h"
 
 #include <QApplication>
 #include <QClipboard>
@@ -9,6 +10,8 @@
 #include <QPlainTextEdit>
 #include <QPushButton>
 #include <QTemporaryDir>
+#include <QToolButton>
+#include <QUndoStack>
 #include <QtTest>
 
 using namespace bb;
@@ -21,6 +24,23 @@ CanonicalType varcharType(int length = 255)
     type.kind = CanonicalType::Kind::Varchar;
     type.length = length;
     return type;
+}
+
+CanonicalType canonical(CanonicalType::Kind kind)
+{
+    CanonicalType type;
+    type.kind = kind;
+    return type;
+}
+
+QToolButton *chipOf(SqlPreviewPanel &panel)
+{
+    return panel.findChild<QToolButton *>(QStringLiteral("sqlFidelityChip"));
+}
+
+QPushButton *resolveAllButtonOf(SqlPreviewPanel &panel)
+{
+    return panel.findChild<QPushButton *>(QStringLiteral("resolveAllButton"));
 }
 
 QPlainTextEdit *editorOf(SqlPreviewPanel &panel)
@@ -41,6 +61,11 @@ private slots:
     void copy_putsSqlOnClipboard();
     void saveToFile_writesGeneratedSql();
     void saveToFile_refusesEmptyPreview();
+    void fidelityChip_summarizesAdvisories();
+    void fidelityChip_isCleanForPostgres();
+    void resolveAll_writesOverridesAndKeepsSql();
+    void resolveAll_isOneUndoStep();
+    void resolveAll_isNoOpWhenNothingToResolve();
 };
 
 void SqlPreviewTest::emptyModel_showsPlaceholder()
@@ -160,6 +185,132 @@ void SqlPreviewTest::saveToFile_refusesEmptyPreview()
     QString error;
     QVERIFY(!panel.saveToFile(temporary.filePath(QStringLiteral("empty.sql")), &error));
     QVERIFY(!error.isEmpty());
+}
+
+void SqlPreviewTest::fidelityChip_summarizesAdvisories()
+{
+    DocumentController document;
+    SqlServerDialect dialect;
+    SqlPreviewPanel panel;
+    panel.setDialect(dialect);
+    panel.setDocument(&document);
+
+    Entity *entity = document.addEntity(QStringLiteral("event"));
+    QVERIFY(entity);
+    document.addColumn(entity->id, QStringLiteral("payload"), canonical(CanonicalType::Kind::Json),
+                       false, false, false, false);
+    panel.refresh();
+
+    QCOMPARE(panel.advisoryCount(), 1);
+    auto *chip = chipOf(panel);
+    QVERIFY(chip);
+    QVERIFY2(chip->text().contains(QStringLiteral("SQL Server")), qPrintable(chip->text()));
+    QVERIFY2(chip->text().contains(QStringLiteral("⚠")), qPrintable(chip->text()));
+    QVERIFY2(chip->text().contains(QStringLiteral("1")), qPrintable(chip->text()));
+
+    auto *resolve = resolveAllButtonOf(panel);
+    QVERIFY(resolve);
+    QVERIFY(resolve->isEnabled());
+    QVERIFY(chip->toolTip().contains(QStringLiteral("payload")));
+}
+
+void SqlPreviewTest::fidelityChip_isCleanForPostgres()
+{
+    DocumentController document;
+    PostgresDialect dialect;
+    SqlPreviewPanel panel;
+    panel.setDialect(dialect);
+    panel.setDocument(&document);
+
+    Entity *entity = document.addEntity(QStringLiteral("event"));
+    QVERIFY(entity);
+    document.addColumn(entity->id, QStringLiteral("payload"), canonical(CanonicalType::Kind::Json),
+                       false, false, false, false);
+    panel.refresh();
+
+    QCOMPARE(panel.advisoryCount(), 0);
+    auto *chip = chipOf(panel);
+    QVERIFY(chip);
+    QCOMPARE(chip->text(), QStringLiteral("PostgreSQL ✓"));
+    QVERIFY(!resolveAllButtonOf(panel)->isEnabled());
+}
+
+void SqlPreviewTest::resolveAll_writesOverridesAndKeepsSql()
+{
+    DocumentController document;
+    SqlServerDialect dialect;
+    SqlPreviewPanel panel;
+    panel.setDialect(dialect);
+    panel.setDocument(&document);
+
+    Entity *entity = document.addEntity(QStringLiteral("event"));
+    QVERIFY(entity);
+    document.addColumn(entity->id, QStringLiteral("payload"), canonical(CanonicalType::Kind::Json),
+                       false, false, false, false);
+
+    panel.refresh();
+    QVERIFY(panel.advisoryCount() > 0);
+    const QString sqlBefore = panel.sql();
+    QVERIFY(!sqlBefore.isEmpty());
+
+    QCOMPARE(panel.resolveAll(), 1);
+    QCOMPARE(panel.advisoryCount(), 0);
+    QCOMPARE(panel.sql(), sqlBefore);
+    QCOMPARE(chipOf(panel)->text(), QStringLiteral("SQL Server ✓"));
+
+    // The accepted decision is stored per engine, so it survives a reload.
+    const Model reloaded = JsonSerializer::fromJson(JsonSerializer::toJson(*document.model()));
+    const Entity *saved = reloaded.findEntity(entity->id);
+    QVERIFY(saved);
+    const Column *payload = saved->findColumn(entity->columns.last().id);
+    QVERIFY(payload);
+    QCOMPARE(payload->dialectOverrides.value(QStringLiteral("sqlserver")),
+             QStringLiteral("nvarchar(max)"));
+}
+
+void SqlPreviewTest::resolveAll_isOneUndoStep()
+{
+    DocumentController document;
+    SqlServerDialect dialect;
+    SqlPreviewPanel panel;
+    panel.setDialect(dialect);
+    panel.setDocument(&document);
+
+    Entity *entity = document.addEntity(QStringLiteral("event"));
+    QVERIFY(entity);
+    document.addColumn(entity->id, QStringLiteral("payload"), canonical(CanonicalType::Kind::Json),
+                       false, false, false, false);
+    document.addColumn(entity->id, QStringLiteral("seen_at"),
+                       canonical(CanonicalType::Kind::Timestamp), false, false, false, false);
+    panel.refresh();
+    QCOMPARE(panel.advisoryCount(), 2);
+
+    const int undoCount = document.undoStack()->count();
+    QCOMPARE(panel.resolveAll(), 2);
+    QCOMPARE(document.undoStack()->count(), undoCount + 1);
+    QCOMPARE(panel.advisoryCount(), 0);
+
+    document.undoStack()->undo();
+    panel.refresh();
+    QCOMPARE(panel.advisoryCount(), 2);
+}
+
+void SqlPreviewTest::resolveAll_isNoOpWhenNothingToResolve()
+{
+    DocumentController document;
+    PostgresDialect dialect;
+    SqlPreviewPanel panel;
+    panel.setDialect(dialect);
+    panel.setDocument(&document);
+
+    Entity *entity = document.addEntity(QStringLiteral("customer"));
+    QVERIFY(entity);
+    document.addColumn(entity->id, QStringLiteral("email"), varcharType(), false, false, true,
+                       false);
+
+    const int undoCount = document.undoStack()->count();
+    QCOMPARE(panel.resolveAll(), 0);
+    QCOMPARE(document.undoStack()->count(), undoCount);
 }
 
 QTEST_MAIN(SqlPreviewTest)
