@@ -133,6 +133,7 @@ private slots:
     void autoGrow_onMove();
     void canvasContextMenu_onEmptySpace();
     void crowsfoot_markersRenderDistinctly();
+    void entityItem_typeLabelsFollowFormatter();
 };
 
 void CanvasTest::syncFromModel_createsItems()
@@ -765,6 +766,33 @@ void CanvasTest::crowsfoot_markersRenderDistinctly()
     QVERIFY(inkCount(many) > 0);
     QVERIFY(inkCount(many) != inkCount(one));
     QVERIFY(inkCount(manyOptional) > inkCount(many));
+}
+
+void CanvasTest::entityItem_typeLabelsFollowFormatter()
+{
+    Model *model = new Model(twoEntitySceneModel());
+    DiagramScene scene;
+    scene.setModel(model);
+    scene.setActiveDiagramId(model->diagrams.first().id);
+    scene.syncFromModel();
+
+    const Entity &customer = model->entities.first();
+    const Column &pk = customer.columns.first();
+    EntityItem *item = scene.itemForEntity(customer.id);
+    QVERIFY(item);
+    QCOMPARE(item->typeLabelFor(pk.id), QStringLiteral("bigint"));
+
+    scene.setColumnTypeFormatter(
+        [](const Entity &, const Column &column) { return QStringLiteral("T:") + column.name; });
+    QCOMPARE(item->typeLabelFor(pk.id), QStringLiteral("T:id"));
+
+    const qreal formattedWidth = item->contentWidth();
+    scene.setColumnTypeFormatter(
+        [](const Entity &, const Column &) { return QString(80, QLatin1Char('W')); });
+    QVERIFY(item->contentWidth() > formattedWidth);
+
+    scene.setColumnTypeFormatter({});
+    QCOMPARE(item->typeLabelFor(pk.id), QStringLiteral("bigint"));
 }
 
 QTEST_MAIN(CanvasTest)
