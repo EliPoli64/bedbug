@@ -11,6 +11,7 @@
 #include <QStyleOptionGraphicsItem>
 
 #include <cmath>
+#include <utility>
 
 namespace bb {
 
@@ -40,22 +41,7 @@ EntityItem::EntityItem(const Entity *entity, QGraphicsItem *parent)
     setCursor(Qt::PointingHandCursor);
 
     if (m_entity) {
-        // Measure with the application font, which is what QGraphicsView paints with by
-        // default.
-        QFontMetricsF metrics{QApplication::font()};
-        QFont titleFont = QApplication::font();
-        titleFont.setBold(true);
-        QFontMetricsF titleMetrics{titleFont};
-
-        m_width = 180.0;
-        m_width = qMax(m_width, titleMetrics.horizontalAdvance(m_entity->name) + kHPadding * 2);
-        for (const Column &column : m_entity->columns) {
-            const qreal rowText = metrics.horizontalAdvance(column.name)
-                                  + metrics.horizontalAdvance(column.type.displayName())
-                                  + kBadgeWidth + kHPadding * 2 + 12.0;
-            m_width = qMax(m_width, rowText);
-        }
-        m_width = qMin(m_width, 440.0);
+        m_width = measureWidth();
 
         QStringList tooltip;
         tooltip << m_entity->name;
@@ -65,6 +51,55 @@ EntityItem::EntityItem(const Entity *entity, QGraphicsItem *parent)
             tooltip << m_entity->comment;
         setToolTip(tooltip.join(QLatin1Char('\n')));
     }
+}
+
+qreal EntityItem::measureWidth() const
+{
+    if (!m_entity)
+        return 180.0;
+
+    // Measure with the application font, which is what QGraphicsView paints with by
+    // default.
+    QFontMetricsF metrics{QApplication::font()};
+    QFont titleFont = QApplication::font();
+    titleFont.setBold(true);
+    QFontMetricsF titleMetrics{titleFont};
+
+    qreal width = 180.0;
+    width = qMax(width, titleMetrics.horizontalAdvance(m_entity->name) + kHPadding * 2);
+    for (const Column &column : m_entity->columns) {
+        const qreal rowText = metrics.horizontalAdvance(column.name)
+                              + metrics.horizontalAdvance(typeLabel(column))
+                              + kBadgeWidth + kHPadding * 2 + 12.0;
+        width = qMax(width, rowText);
+    }
+    return qMin(width, 440.0);
+}
+
+void EntityItem::setTypeFormatter(TypeFormatter formatter)
+{
+    m_typeFormatter = std::move(formatter);
+    prepareGeometryChange();
+    m_width = measureWidth();
+    update();
+}
+
+QString EntityItem::typeLabel(const Column &column) const
+{
+    if (m_typeFormatter && m_entity)
+        return m_typeFormatter(*m_entity, column);
+    return column.type.displayName();
+}
+
+QString EntityItem::typeLabelFor(const Id &columnId) const
+{
+    if (!m_entity)
+        return {};
+    for (const Column &column : m_entity->columns) {
+        if (column.id == columnId)
+            return typeLabel(column);
+    }
+    return {};
 }
 
 qreal EntityItem::contentWidth() const
@@ -180,7 +215,7 @@ void EntityItem::paint(QPainter *painter, const QStyleOptionGraphicsItem *option
         }
 
         // Type, right-aligned, muted.
-        const QString typeText = column.type.displayName();
+        const QString typeText = typeLabel(column);
         const qreal typeWidth = metrics.horizontalAdvance(typeText);
         const QRectF typeRect(m_width - kHPadding - typeWidth, y, typeWidth, kRowHeight);
         painter->setPen(mutedColor);

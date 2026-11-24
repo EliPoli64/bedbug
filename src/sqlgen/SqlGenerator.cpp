@@ -154,18 +154,22 @@ QList<QString> SqlGenerator::statements(const Model &model, const SqlDialect &di
 
         if (options.includeComments) {
             if (!entity->comment.isEmpty()) {
-                statements.append(dialect.commentOn(
+                const QString statement = dialect.commentOn(
                     QStringLiteral("TABLE %1").arg(qualifiedName(*entity, dialect, options)),
-                    entity->comment));
+                    entity->comment);
+                if (!statement.isEmpty())
+                    statements.append(statement);
             }
             for (const Column &column : entity->columns) {
                 if (column.comment.isEmpty())
                     continue;
-                statements.append(dialect.commentOn(
+                const QString statement = dialect.commentOn(
                     QStringLiteral("COLUMN %1.%2")
                         .arg(qualifiedName(*entity, dialect, options),
                              dialect.quoteIdent(column.name)),
-                    column.comment));
+                    column.comment);
+                if (!statement.isEmpty())
+                    statements.append(statement);
             }
         }
     }

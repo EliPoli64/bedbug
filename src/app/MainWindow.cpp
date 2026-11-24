@@ -1,11 +1,14 @@
 #include "MainWindow.h"
 
 #include "ColumnEditorDialog.h"
+#include "DialectRegistry.h"
+#include "DialectSelector.h"
 #include "DiagramScene.h"
 #include "DocumentController.h"
 #include "EntityEditorPanel.h"
 #include "EntityItem.h"
 #include "SettingsDialog.h"
+#include "SqlGenerator.h"
 #include "SqlPreviewPanel.h"
 
 #include <QAction>
@@ -59,6 +62,18 @@ MainWindow::MainWindow(QWidget *parent)
 
     m_scene->setModel(m_document->model());
     m_scene->setActiveDiagramId(m_document->activeDiagramId());
+
+    const QString savedDialect =
+        QSettings().value(QStringLiteral("targetDialect"),
+                          DialectRegistry::fallback()->id())
+            .toString();
+    m_dialect = DialectRegistry::find(savedDialect);
+    if (!m_dialect)
+        m_dialect = DialectRegistry::fallback();
+    m_scene->setColumnTypeFormatter([this](const Entity &entity, const Column &column) {
+        return SqlGenerator::resolveType(entity, column, *m_dialect);
+    });
+
     applyRuntimeSettings();
     connect(m_document, &DocumentController::modelChanged, this,
             &MainWindow::syncScenePreservingSelection);
@@ -293,6 +308,13 @@ void MainWindow::createToolBars()
     toolBar->addAction(m_snapAction);
     toolBar->addSeparator();
     toolBar->addAction(m_canvasSizeAction);
+    toolBar->addSeparator();
+
+    m_dialectSelector = new DialectSelector(toolBar);
+    m_dialectSelector->setCurrentDialectId(m_dialect->id());
+    toolBar->addWidget(m_dialectSelector);
+    connect(m_dialectSelector, &DialectSelector::dialectSelected, this,
+            &MainWindow::setTargetDialect);
 }
 
 void MainWindow::createMenus()
@@ -355,11 +377,24 @@ void MainWindow::createDock()
     sqlDock->setAllowedAreas(Qt::AllDockWidgetAreas);
 
     m_sqlPreview = new SqlPreviewPanel(sqlDock);
-    m_sqlPreview->setDialect(m_postgresDialect);
+    m_sqlPreview->setDialect(*m_dialect);
     m_sqlPreview->setDocument(m_document);
     sqlDock->setWidget(m_sqlPreview);
 
     addDockWidget(Qt::BottomDockWidgetArea, sqlDock);
+}
+
+void MainWindow::setTargetDialect(const QString &id)
+{
+    const SqlDialect *dialect = DialectRegistry::find(id);
+    if (!dialect || dialect == m_dialect)
+        return;
+
+    // Switching engines is a view/export parameter: it never touches the model.
+    m_dialect = dialect;
+    m_sqlPreview->setDialect(*m_dialect);
+    m_scene->refreshTypeLabels();
+    QSettings().setValue(QStringLiteral("targetDialect"), id);
 }
 
 void MainWindow::syncScenePreservingSelection()

@@ -65,6 +65,20 @@ RelationshipItem *DiagramScene::itemForRelationship(const Id &relationshipId) co
     return m_relationshipItems.value(relationshipId, nullptr);
 }
 
+void DiagramScene::setColumnTypeFormatter(ColumnTypeFormatter formatter)
+{
+    m_columnTypeFormatter = std::move(formatter);
+    refreshTypeLabels();
+}
+
+void DiagramScene::refreshTypeLabels()
+{
+    for (EntityItem *item : std::as_const(m_items))
+        item->setTypeFormatter(m_columnTypeFormatter);
+    // Label widths can change, which moves the edge ports.
+    refreshRelationships();
+}
+
 void DiagramScene::setLinkTool(std::optional<RelationshipKind> tool)
 {
     if (m_linkTool == tool)
@@ -362,6 +376,7 @@ void DiagramScene::syncFromModel()
             continue;
 
         auto *item = new EntityItem(entity);
+        item->setTypeFormatter(m_columnTypeFormatter);
         item->setFlag(QGraphicsItem::ItemIsMovable);
         item->setFlag(QGraphicsItem::ItemIsSelectable);
         item->setFlag(QGraphicsItem::ItemSendsGeometryChanges);

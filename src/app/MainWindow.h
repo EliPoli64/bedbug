@@ -2,15 +2,16 @@
 
 #include "DiagramView.h"
 #include "Id.h"
-#include "dialects/Postgres.h"
 
 #include <QMainWindow>
 
 namespace bb {
 
+class DialectSelector;
 class DiagramScene;
 class DocumentController;
 class EntityEditorPanel;
+class SqlDialect;
 class SqlPreviewPanel;
 
 class MainWindow : public QMainWindow
@@ -32,6 +33,7 @@ private:
     void syncScenePreservingSelection();
     void updateStatusMessage();
     void applyRuntimeSettings();
+    void setTargetDialect(const QString &id);
 
     bool m_initialCenter = true;
     bool m_addingTable = false;
@@ -62,7 +64,8 @@ protected:
     DiagramView *m_view = nullptr;
     EntityEditorPanel *m_entityPanel = nullptr;
     SqlPreviewPanel *m_sqlPreview = nullptr;
-    PostgresDialect m_postgresDialect;
+    DialectSelector *m_dialectSelector = nullptr;
+    const SqlDialect *m_dialect = nullptr;
     QAction *m_addTableAction = nullptr;
     QAction *m_newAction = nullptr;
     QAction *m_openAction = nullptr;

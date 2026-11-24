@@ -2,6 +2,8 @@
 qt_add_library(bb_editor STATIC
     ColumnEditorDialog.cpp
     ColumnEditorDialog.h
+    DialectSelector.cpp
+    DialectSelector.h
     EntityEditorPanel.cpp
     EntityEditorPanel.h
     SettingsDialog.cpp

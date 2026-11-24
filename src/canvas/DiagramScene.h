@@ -38,6 +38,12 @@ public:
     EntityItem *itemForEntity(const Id &entityId) const;
     RelationshipItem *itemForRelationship(const Id &relationshipId) const;
 
+    // Column type labels follow the selected target engine. The formatter is applied to
+    // every current and future EntityItem; switching engines calls refreshTypeLabels().
+    using ColumnTypeFormatter = std::function<QString(const Entity &, const Column &)>;
+    void setColumnTypeFormatter(ColumnTypeFormatter formatter);
+    void refreshTypeLabels();
+
     // The active Diagram within m_model, or nullptr.
     Diagram *currentDiagram();
 
@@ -118,6 +124,7 @@ private:
     Id m_diagramId;
     QHash<Id, EntityItem *> m_items;
     QHash<Id, RelationshipItem *> m_relationshipItems;
+    ColumnTypeFormatter m_columnTypeFormatter;
     bool m_snapToGrid = false;   // Workbench-like free dragging by default
     bool m_autoGrowCanvas = true;
 

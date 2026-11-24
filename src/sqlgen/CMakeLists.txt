@@ -1,7 +1,11 @@
 qt_add_library(bb_sqlgen STATIC
+    DialectRegistry.cpp
+    DialectRegistry.h
     SqlDialect.h
     SqlGenerator.cpp
     SqlGenerator.h
+    dialects/MySql.cpp
+    dialects/MySql.h
     dialects/Postgres.cpp
     dialects/Postgres.h
 )

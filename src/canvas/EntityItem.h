@@ -52,6 +52,14 @@ public:
     // Called by DiagramScene; fires whenever the item moves (after snapping).
     void setOnMoved(std::function<void(const QPointF &pos)> callback);
 
+    // Renders column types for the selected target engine. Without a formatter the
+    // canonical type name is shown.
+    using TypeFormatter = std::function<QString(const Entity &, const Column &)>;
+    void setTypeFormatter(TypeFormatter formatter);
+
+    // Test hook: the label currently painted for a column.
+    QString typeLabelFor(const Id &columnId) const;
+
     qreal contentWidth() const;
 
 protected:
@@ -59,9 +67,12 @@ protected:
 
 private:
     int indexOfColumn(const Id &columnId) const;
+    QString typeLabel(const Column &column) const;
+    qreal measureWidth() const;
 
     const Entity *m_entity = nullptr;
     qreal m_width = 140.0;
+    TypeFormatter m_typeFormatter;
     std::function<void(const QPointF &pos)> m_onMoved;
 };
 
